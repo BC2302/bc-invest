@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="m" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#F4F5F7"/>
+      <stop offset="0.55" stop-color="#B8BCC4"/>
+      <stop offset="1" stop-color="#8E939C"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" fill="#0A0A0B"/>
+  <rect x="112" y="112" width="288" height="288" fill="none" stroke="url(#m)" stroke-width="8"/>
+  <text x="256" y="300" text-anchor="middle" font-family="Cinzel, 'DejaVu Serif', Georgia, serif" font-weight="700" font-size="130" letter-spacing="6" fill="url(#m)">BC</text>
+</svg>
