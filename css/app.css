@@ -126,6 +126,8 @@ a:hover { color: var(--silver-hi); }
 .stat.boxed { background: var(--surface-2); padding: 12px 14px; }
 .stat-label { font-size: 11px; color: var(--muted-2); }
 .stat-value { font-size: 16px; font-weight: 600; color: var(--text-2); }
+.month-balance { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.month-value { font-family: var(--font-serif); font-size: 26px; font-weight: 600; color: var(--silver-hi); line-height: 1; }
 
 /* ---------- Sistemas (grade da home) ---------- */
 .systems { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }

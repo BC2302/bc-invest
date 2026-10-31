@@ -1,6 +1,6 @@
 // Tela inicial
 import * as data from '../data.js';
-import { esc, brl, brlParts, icon, tabbar } from '../ui.js';
+import { esc, brl, brlParts, icon, tabbar, nomeMes } from '../ui.js';
 
 const DICAS = [
   'Antes de investir no longo prazo, monte sua reserva de emergência: o recomendado costuma ser de 6 a 12 meses do seu custo de vida.',
@@ -36,16 +36,18 @@ export async function renderInicio(root, ctx) {
   root.innerHTML = `<main class="screen"><div class="loading">Carregando…</div></main>${tabbar('inicio')}`;
 
   const hoje = new Date();
-  const [lancs, metas] = await Promise.all([
+  const [lancs, metas, geral] = await Promise.all([
     data.lancamentosDoMes(hoje.getFullYear(), hoje.getMonth()),
     data.metas(),
+    data.resumoGeral(),
   ]);
   if (!ctx.alive()) return;
 
   const r = data.resumo(lancs);
   const reserva = metas.find((m) => m.is_reserva);
   const guardadoMetas = metas.reduce((s, m) => s + Number(m.valor_atual), 0);
-  const [inteiro, cents] = brlParts(r.saldo);
+  const [inteiro, cents] = brlParts(geral.saldo);
+  const mesAtual = nomeMes(hoje.getFullYear(), hoje.getMonth()).split(' ')[0];
   const mask = (txt) => (ocultar ? '•••••' : txt);
 
   root.innerHTML = `<main class="screen">
@@ -60,16 +62,20 @@ export async function renderInicio(root, ctx) {
 
     <p class="greeting">Olá${primeiroNome ? `, ${esc(primeiroNome)}` : ''}</p>
 
-    <section class="card" aria-label="Resumo do mês">
+    <section class="card" aria-label="Resumo financeiro">
       <div class="section-head">
-        <span class="eyebrow">Saldo do mês</span>
+        <span class="eyebrow">Saldo total disponível</span>
         <button class="icon-btn ghost" type="button" id="olho" aria-label="${ocultar ? 'Mostrar valores' : 'Ocultar valores'}" style="margin:-12px -12px -12px 0">${icon(ocultar ? 'eyeOff' : 'eye', 18)}</button>
       </div>
-      <div class="big-number">${ocultar ? '•••••' : `${esc(inteiro)}<span class="cents">${esc(cents)}</span>`}</div>
+      <div class="big-number${geral.saldo < 0 ? ' neg' : ''}">${ocultar ? '•••••' : `${esc(inteiro)}<span class="cents">${esc(cents)}</span>`}</div>
       <div class="divider"></div>
+      <div class="month-balance">
+        <span class="stat-label">Saldo do mês · ${mesAtual}</span>
+        <span class="month-value${r.saldo < 0 ? ' neg' : ''}">${mask(brl(r.saldo))}</span>
+      </div>
       <div class="grid-2">
-        <div class="stat"><span class="stat-label">Receitas</span><span class="stat-value pos">${mask(brl(r.receitas))}</span></div>
-        <div class="stat"><span class="stat-label">Despesas</span><span class="stat-value neg">${mask(brl(r.despesas))}</span></div>
+        <div class="stat"><span class="stat-label">Receitas do mês</span><span class="stat-value pos">${mask(brl(r.receitas))}</span></div>
+        <div class="stat"><span class="stat-label">Despesas do mês</span><span class="stat-value neg">${mask(brl(r.despesas))}</span></div>
         <div class="stat"><span class="stat-label">Guardado em metas</span><span class="stat-value">${mask(brl(guardadoMetas))}</span></div>
         <div class="stat"><span class="stat-label">Lançamentos no mês</span><span class="stat-value">${lancs.length}</span></div>
       </div>

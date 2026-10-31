@@ -213,4 +213,5 @@ export const db = {
   update: (table, id, patch) =>
     rest(`${table}?id=eq.${encodeURIComponent(id)}`, { method: 'PATCH', body: patch, prefer: 'return=representation' }).then((r) => r?.[0]),
   remove: (table, id) => rest(`${table}?id=eq.${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  rpc: (fn, args = {}) => rest(`rpc/${fn}`, { method: 'POST', body: args }),
 };

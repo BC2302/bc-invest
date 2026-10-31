@@ -126,3 +126,17 @@ revoke execute on function public.checa_categoria_do_usuario() from public, anon
 
 -- anon não precisa de acesso às tabelas
 revoke all on public.perfis, public.categorias, public.lancamentos, public.metas from anon;
+
+-- ---------- Saldo total disponível (todos os lançamentos do usuário) ----
+create or replace function public.resumo_geral()
+returns table (receitas numeric, despesas numeric)
+language sql stable security invoker set search_path = '' as $$
+  select
+    coalesce(sum(l.valor) filter (where l.tipo = 'receita'), 0) as receitas,
+    coalesce(sum(l.valor) filter (where l.tipo = 'despesa'), 0) as despesas
+  from public.lancamentos l
+  where l.user_id = (select auth.uid());
+$$;
+
+revoke execute on function public.resumo_geral() from public, anon;
+grant execute on function public.resumo_geral() to authenticated;

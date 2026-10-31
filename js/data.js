@@ -12,6 +12,15 @@ export function lancamentosDoMes(ano, mes) {
 
 export const metas = () => db.select('metas', 'select=*&order=is_reserva.desc,criado_em.asc');
 
+// Totais de todos os tempos (para o saldo total disponível)
+export async function resumoGeral() {
+  const rows = await db.rpc('resumo_geral');
+  const r = rows?.[0] || {};
+  const receitas = Number(r.receitas) || 0;
+  const despesas = Number(r.despesas) || 0;
+  return { receitas, despesas, saldo: receitas - despesas };
+}
+
 export function resumo(lancs) {
   let receitas = 0; let despesas = 0;
   for (const l of lancs) {
