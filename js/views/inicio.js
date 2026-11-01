@@ -1,6 +1,7 @@
 // Tela inicial
 import * as data from '../data.js';
-import { esc, brl, brlParts, icon, tabbar, nomeMes } from '../ui.js';
+import { esc, brl, brlParts, icon, tabbar, nomeMes, dataLonga } from '../ui.js';
+import { situacao, nomeVencimento } from './contas.js';
 
 const DICAS = [
   'Antes de investir no longo prazo, monte sua reserva de emergência: o recomendado costuma ser de 6 a 12 meses do seu custo de vida.',
@@ -21,11 +22,11 @@ function dicaDoDia() {
 
 const SISTEMAS = [
   { id: 'gastos', nome: 'Gastos', ic: 'wallet' },
+  { id: 'contas', nome: 'Contas a pagar', ic: 'calendar' },
   { id: 'metas', nome: 'Metas', ic: 'target' },
   { id: 'simulador', nome: 'Simuladores', ic: 'calc' },
   { nome: 'Carteira', ic: 'pie' },
   { nome: 'Aprender', ic: 'book' },
-  { nome: 'Notícias', ic: 'news' },
 ];
 
 let ocultar = false;
@@ -36,10 +37,11 @@ export async function renderInicio(root, ctx) {
   root.innerHTML = `<main class="screen"><div class="loading">Carregando…</div></main>${tabbar('inicio')}`;
 
   const hoje = new Date();
-  const [lancs, metas, geral] = await Promise.all([
+  const [lancs, metas, geral, proximos] = await Promise.all([
     data.lancamentosDoMes(hoje.getFullYear(), hoje.getMonth()),
     data.metas(),
     data.resumoGeral(),
+    data.proximosVencimentos().catch(() => []),
   ]);
   if (!ctx.alive()) return;
 
@@ -80,6 +82,18 @@ export async function renderInicio(root, ctx) {
         <div class="stat"><span class="stat-label">Lançamentos no mês</span><span class="stat-value">${lancs.length}</span></div>
       </div>
     </section>
+
+    ${proximos.length ? `<section class="section">
+      <div class="section-head"><h2 class="h-section">Contas a vencer</h2><a class="link-btn" href="#/contas">Ver todas</a></div>
+      <div class="list">${proximos.map((v) => {
+        const st = situacao(v);
+        return `<a class="item" href="#/contas" style="text-decoration:none">
+          <span class="item-icon ${st.cls}">${icon('calendar', 18, 'currentColor', 1.6)}</span>
+          <span class="item-body"><span class="item-title">${esc(nomeVencimento(v))}</span><span class="item-sub">${dataLonga(v.vencimento)}</span></span>
+          <span class="item-right"><span class="item-value">${mask(brl(v.valor))}</span><span class="chip ${st.cls}">${st.txt}</span></span>
+        </a>`;
+      }).join('')}</div>
+    </section>` : ''}
 
     <section class="section">
       <h2 class="h-section">Seus sistemas</h2>

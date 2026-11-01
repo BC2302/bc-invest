@@ -44,6 +44,8 @@ export function dataLonga(s) { const d = parseISO(s); return `${pad(d.getDate())
 export function limitesMes(y, m) {
   return { inicio: isoDate(new Date(y, m, 1)), fim: isoDate(new Date(y, m + 1, 0)) };
 }
+export function addDias(iso, n) { const d = parseISO(iso); d.setDate(d.getDate() + n); return isoDate(d); }
+export function diasEntre(deISO, ateISO) { return Math.round((parseISO(ateISO) - parseISO(deISO)) / 86400000); }
 export function mesesAte(prazoISO) {
   const hoje = new Date();
   const p = parseISO(prazoISO);
@@ -60,6 +62,9 @@ const P = {
   book: '<path d="M3 5h6a3 3 0 0 1 3 3v12a2 2 0 0 0-2-2H3zM21 5h-6a3 3 0 0 0-3 3v12a2 2 0 0 1 2-2h7z"/>',
   news: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 8h10M7 12h10M7 16h6"/>',
   user: '<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',
+  calendar: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>',
+  bell: '<path d="M6 16v-5a6 6 0 0 1 12 0v5l2 2H4z"/><path d="M10 21h4"/>',
+  check: '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
   back: '<path d="M15 5l-7 7 7 7"/>',
   next: '<path d="M9 5l7 7-7 7"/>',
   plus: '<path d="M12 5v14M5 12h14"/>',
@@ -79,9 +84,9 @@ export function icon(name, size = 20, stroke = 'currentColor', width = 1.5) {
 const TABS = [
   ['inicio', 'Início', 'home'],
   ['gastos', 'Gastos', 'wallet'],
+  ['contas', 'A pagar', 'calendar'],
   ['metas', 'Metas', 'target'],
   ['simulador', 'Simular', 'calc'],
-  ['conta', 'Conta', 'user'],
 ];
 export function tabbar(active) {
   return `<nav class="tabbar" aria-label="Menu principal">${TABS.map(([id, label, ic]) =>

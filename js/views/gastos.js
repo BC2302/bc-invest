@@ -1,6 +1,7 @@
 // Gestão de gastos: resumo do mês, orçamento por categoria e lançamentos
 import * as data from '../data.js';
 import { db, mensagemErro } from '../supa.js';
+import { opcoesCategoria, campoNovaCategoria, ligarNovaCategoria, resolverCategoria } from '../categoria.js';
 import {
   esc, brl, brlParts, icon, tabbar, topbar, nomeMes, dataCurta, hojeISO, isoDate,
   parseValor, valorInput, openSheet, closeSheet, toast, busy,
@@ -104,8 +105,7 @@ function dataPadrao() {
 
 function formLancamento(lanc, cats, recarregar) {
   let tipo = lanc?.tipo || 'despesa';
-  const opcoes = (t) => `<option value="">Sem categoria</option>${cats.filter((c) => c.tipo === t)
-    .map((c) => `<option value="${esc(c.id)}"${lanc?.categoria_id === c.id ? ' selected' : ''}>${esc(c.nome)}</option>`).join('')}`;
+  const opcoes = (t) => opcoesCategoria(cats, t, lanc?.categoria_id);
 
   const sheet = openSheet(lanc ? 'Editar lançamento' : 'Novo lançamento', `
     <form class="form" novalidate>
@@ -123,6 +123,7 @@ function formLancamento(lanc, cats, recarregar) {
         <label class="field">Data
           <input name="data" type="date" value="${esc(lanc?.data || dataPadrao())}" required></label>
       </div>
+      ${campoNovaCategoria()}
       <p class="form-error" role="alert" hidden></p>
       <button class="btn" type="submit">${lanc ? 'Salvar alterações' : 'Adicionar'}</button>
       ${lanc ? '<button class="btn danger" type="button" id="excluir">Excluir lançamento</button>' : ''}
@@ -132,11 +133,13 @@ function formLancamento(lanc, cats, recarregar) {
   const err = form.querySelector('.form-error');
   const falha = (t) => { err.textContent = t; err.hidden = false; };
   form.valor.focus();
+  const atualizarCat = ligarNovaCategoria(form);
 
   sheet.querySelectorAll('[data-tipo]').forEach((b) => b.addEventListener('click', () => {
     tipo = b.dataset.tipo;
     sheet.querySelectorAll('[data-tipo]').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
     form.categoria.innerHTML = opcoes(tipo);
+    atualizarCat();
   }));
 
   form.addEventListener('submit', async (e) => {
@@ -148,13 +151,15 @@ function formLancamento(lanc, cats, recarregar) {
     if (valor > 999999999999) return falha('Valor muito alto.');
     if (!descricao) return falha('Informe uma descrição.');
     if (!/^\d{4}-\d{2}-\d{2}$/.test(dataISO)) return falha('Informe a data.');
-    const row = { tipo, valor, descricao, data: dataISO, categoria_id: form.categoria.value || null };
     try {
-      await busy(form.querySelector('button[type=submit]'), () => (lanc ? db.update('lancamentos', lanc.id, row) : db.insert('lancamentos', row)));
+      await busy(form.querySelector('button[type=submit]'), async () => {
+        const row = { tipo, valor, descricao, data: dataISO, categoria_id: await resolverCategoria(form, cats, tipo) };
+        return lanc ? db.update('lancamentos', lanc.id, row) : db.insert('lancamentos', row);
+      });
       closeSheet();
       toast(lanc ? 'Lançamento atualizado.' : 'Lançamento adicionado.');
       recarregar();
-    } catch (ex) { falha(mensagemErro(ex)); }
+    } catch (ex) { falha(ex.message?.startsWith('Informe') ? ex.message : mensagemErro(ex)); }
   });
 
   const del = sheet.querySelector('#excluir');

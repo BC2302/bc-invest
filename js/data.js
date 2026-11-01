@@ -1,6 +1,6 @@
 // Consultas ao banco usadas pelas telas
 import { db } from './supa.js';
-import { limitesMes } from './ui.js';
+import { limitesMes, hojeISO, addDias } from './ui.js';
 
 export const categorias = () => db.select('categorias', 'select=id,nome,tipo,orcamento&order=nome.asc');
 
@@ -29,3 +29,20 @@ export function resumo(lancs) {
   }
   return { receitas, despesas, saldo: receitas - despesas };
 }
+
+// ---------- Contas a pagar ----------
+export const contas = () => db.select('contas', 'select=id,descricao,valor,categoria_id,repeticao,dia_vencimento,parcelas,ativa');
+
+const CAMPOS_VENC = 'select=id,conta_id,descricao,valor,categoria_id,vencimento,parcela,total_parcelas,pago_em';
+
+export function vencimentosDoMes(ano, mes) {
+  const { inicio, fim } = limitesMes(ano, mes);
+  return db.select('vencimentos', `${CAMPOS_VENC}&vencimento=gte.${inicio}&vencimento=lte.${fim}&order=vencimento.asc,descricao.asc`);
+}
+
+export const vencimentosAtrasados = () =>
+  db.select('vencimentos', `select=id,valor&pago_em=is.null&vencimento=lt.${hojeISO()}`);
+
+// Em aberto: atrasadas e as que vencem nos próximos dias
+export const proximosVencimentos = (dias = 7, limite = 4) =>
+  db.select('vencimentos', `${CAMPOS_VENC}&pago_em=is.null&vencimento=lte.${addDias(hojeISO(), dias)}&order=vencimento.asc&limit=${limite}`);

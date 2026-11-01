@@ -1,5 +1,6 @@
 // Minha conta
 import * as supa from '../supa.js';
+import { cartaoAvisos, desativar } from '../push.js';
 import { esc, tabbar, topbar, icon, toast, busy } from '../ui.js';
 
 export function renderConta(root, ctx) {
@@ -13,6 +14,8 @@ export function renderConta(root, ctx) {
         <span class="small">${esc(email)}</span>
       </div>
     </section>
+
+    <section class="section"><h2 class="h-section">Avisos</h2><div id="avisos"></div></section>
 
     <form class="form" id="f-nome" novalidate>
       <h2 class="h-section">Seu nome</h2>
@@ -64,5 +67,10 @@ export function renderConta(root, ctx) {
     } catch (ex) { err.textContent = supa.mensagemErro(ex); err.hidden = false; }
   });
 
-  root.querySelector('#sair').addEventListener('click', () => supa.signOut());
+  cartaoAvisos(root.querySelector('#avisos'));
+  root.querySelector('#sair').addEventListener('click', async (e) => {
+    e.currentTarget.disabled = true;
+    await desativar();
+    supa.signOut();
+  });
 }

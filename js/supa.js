@@ -49,6 +49,8 @@ const ERROS = [
   [/rate limit|too many requests|security purposes/i, 'Muitas tentativas. Aguarde um pouco e tente de novo.'],
   [/same.?password|should be different/i, 'A nova senha precisa ser diferente da atual.'],
   [/jwt expired|invalid jwt|not authenticated/i, 'Sua sessão expirou. Entre novamente.'],
+  [/número de parcelas/i, 'Informe o número de parcelas (2 ou mais).'],
+  [/conta não encontrada/i, 'Conta não encontrada. Atualize a página.'],
   [/categoria inv/i, 'Categoria inválida. Recarregue a página e tente de novo.'],
   [/failed to fetch|networkerror|load failed/i, 'Sem conexão com o servidor. Verifique sua internet.'],
 ];
