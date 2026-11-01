@@ -7,12 +7,11 @@ import { renderGastos } from './views/gastos.js';
 import { renderMetas } from './views/metas.js';
 import { renderSimulador } from './views/simulador.js';
 import { renderConta } from './views/conta.js';
-import { renderContas } from './views/contas.js';
 
 const VIEWS = {
   inicio: renderInicio,
   gastos: renderGastos,
-  contas: renderContas,
+  contas: renderGastos, // links antigos e notificações
   metas: renderMetas,
   simulador: renderSimulador,
   conta: renderConta,

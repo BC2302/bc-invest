@@ -33,7 +33,7 @@ export function resumo(lancs) {
 // ---------- Contas a pagar ----------
 export const contas = () => db.select('contas', 'select=id,descricao,valor,categoria_id,repeticao,dia_vencimento,parcelas,ativa');
 
-const CAMPOS_VENC = 'select=id,conta_id,descricao,valor,categoria_id,vencimento,parcela,total_parcelas,pago_em';
+const CAMPOS_VENC = 'select=id,conta_id,descricao,valor,categoria_id,vencimento,parcela,total_parcelas,pago_em,lancamento_id';
 
 export function vencimentosDoMes(ano, mes) {
   const { inicio, fim } = limitesMes(ano, mes);
@@ -41,7 +41,10 @@ export function vencimentosDoMes(ano, mes) {
 }
 
 export const vencimentosAtrasados = () =>
-  db.select('vencimentos', `select=id,valor&pago_em=is.null&vencimento=lt.${hojeISO()}`);
+  db.select('vencimentos', `${CAMPOS_VENC}&pago_em=is.null&vencimento=lt.${hojeISO()}&order=vencimento.asc`);
+
+export const vencimentosPorLancamento = (ids) =>
+  db.select('vencimentos', `${CAMPOS_VENC}&lancamento_id=in.(${ids.join(',')})`);
 
 // Em aberto: atrasadas e as que vencem nos próximos dias
 export const proximosVencimentos = (dias = 7, limite = 4) =>

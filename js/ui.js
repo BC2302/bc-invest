@@ -84,9 +84,9 @@ export function icon(name, size = 20, stroke = 'currentColor', width = 1.5) {
 const TABS = [
   ['inicio', 'Início', 'home'],
   ['gastos', 'Gastos', 'wallet'],
-  ['contas', 'A pagar', 'calendar'],
   ['metas', 'Metas', 'target'],
   ['simulador', 'Simular', 'calc'],
+  ['conta', 'Conta', 'user'],
 ];
 export function tabbar(active) {
   return `<nav class="tabbar" aria-label="Menu principal">${TABS.map(([id, label, ic]) =>
