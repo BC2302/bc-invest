@@ -1,7 +1,7 @@
 // Tela inicial
 import * as data from '../data.js';
-import { esc, brl, brlParts, icon, tabbar, nomeMes, dataLonga } from '../ui.js';
-import { situacao, nomeVencimento } from './contas.js';
+import { esc, brl, brlParts, icon, tabbar, nomeMes, dataLonga, limitesMes } from '../ui.js';
+import { situacao, nomeVencimento, previaHTML } from './contas.js';
 
 const DICAS = [
   'Antes de investir no longo prazo, monte sua reserva de emergência: o recomendado costuma ser de 6 a 12 meses do seu custo de vida.',
@@ -37,11 +37,12 @@ export async function renderInicio(root, ctx) {
   root.innerHTML = `<main class="screen"><div class="loading">Carregando…</div></main>${tabbar('inicio')}`;
 
   const hoje = new Date();
-  const [lancs, metas, geral, proximos] = await Promise.all([
+  const [lancs, metas, geral, proximos, aberto] = await Promise.all([
     data.lancamentosDoMes(hoje.getFullYear(), hoje.getMonth()),
     data.metas(),
     data.resumoGeral(),
     data.proximosVencimentos().catch(() => []),
+    data.totalEmAbertoAte(limitesMes(hoje.getFullYear(), hoje.getMonth()).fim).catch(() => null),
   ]);
   if (!ctx.alive()) return;
 
@@ -81,6 +82,7 @@ export async function renderInicio(root, ctx) {
         <div class="stat"><span class="stat-label">Guardado em metas</span><span class="stat-value">${mask(brl(guardadoMetas))}</span></div>
         <div class="stat"><span class="stat-label">Lançamentos no mês</span><span class="stat-value">${lancs.length}</span></div>
       </div>
+      ${aberto ? previaHTML(geral.saldo, aberto, `até o fim de ${mesAtual.toLowerCase()}`, mask) : ''}
     </section>
 
     ${proximos.length ? `<section class="section">

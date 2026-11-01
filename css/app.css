@@ -310,3 +310,12 @@ a:hover { color: var(--silver-hi); }
 .pay-btn { flex-shrink: 0; min-height: 40px; min-width: 64px; padding: 0 12px; border: 1px solid var(--line-2); background: #141416; color: var(--silver-hi); font-size: 12px; font-weight: 700; letter-spacing: .5px; cursor: pointer; }
 .pay-btn:hover { border-color: var(--silver); }
 .pay-btn:disabled { opacity: .6; }
+
+/* Prévia: o saldo dá para pagar as contas? */
+.previa { border: 1px solid var(--line-2); padding: 14px 16px; display: grid; gap: 8px; text-align: left; }
+.previa.falta { border-color: var(--neg); }
+.previa-linha { display: flex; justify-content: space-between; gap: 12px; font-size: 14px; color: var(--text-2); }
+.previa-total { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding-top: 10px; border-top: 1px solid var(--line); font-weight: 600; }
+.previa-linha span:last-child, .previa-total strong { white-space: nowrap; }
+.previa-total strong { font-size: 20px; }
+.previa .fine { margin: 0; }

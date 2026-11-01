@@ -3,7 +3,7 @@ import * as data from '../data.js';
 import { db, mensagemErro } from '../supa.js';
 import { cartaoAvisos } from '../push.js';
 import { opcoesCategoria, campoNovaCategoria, ligarNovaCategoria, resolverCategoria } from '../categoria.js';
-import { situacao, nomeVencimento, painelVencimento, REPETICAO } from './contas.js';
+import { situacao, nomeVencimento, painelVencimento, previaHTML, REPETICAO } from './contas.js';
 import {
   esc, brl, brlParts, icon, tabbar, topbar, nomeMes, dataCurta, hojeISO, isoDate, limitesMes,
   parseValor, valorInput, openSheet, closeSheet, toast, busy,
@@ -17,9 +17,13 @@ export async function renderGastos(root, ctx) {
   root.innerHTML = `<main class="screen">${topbar('Gastos')}<div class="loading">Carregando…</div></main>${tabbar('gastos')}`;
   try { await db.rpc('gerar_vencimentos'); } catch { /* segue com o que já existe */ }
   const mesAtual = ano === hoje.getFullYear() && mes === hoje.getMonth();
-  const [cats, contas, lancs, vencsMes, atrasadas] = await Promise.all([
+  const futuroOuAtual = ano > hoje.getFullYear() || (ano === hoje.getFullYear() && mes >= hoje.getMonth());
+  const fimMes = limitesMes(ano, mes).fim;
+  const [cats, contas, lancs, vencsMes, atrasadas, geral, aberto] = await Promise.all([
     data.categorias(), data.contas(), data.lancamentosDoMes(ano, mes), data.vencimentosDoMes(ano, mes),
     mesAtual ? data.vencimentosAtrasados() : Promise.resolve([]),
+    futuroOuAtual ? data.resumoGeral().catch(() => null) : null,
+    futuroOuAtual ? data.totalEmAbertoAte(fimMes).catch(() => null) : null,
   ]);
   // contas pagas cujo pagamento caiu neste mês (para ligar o lançamento à conta)
   const pagas = lancs.length ? await data.vencimentosPorLancamento(lancs.map((l) => l.id)) : [];
@@ -105,6 +109,7 @@ export async function renderGastos(root, ctx) {
         <div class="stat boxed"><span class="stat-label">Pagas</span><span class="stat-value neg">${brl(r.despesas)}</span></div>
         <div class="stat boxed"><span class="stat-label">A pagar</span><span class="stat-value warn">${brl(totalAPagar)}</span></div>
       </div>
+      ${geral && aberto ? previaHTML(geral.saldo, aberto, mesAtual ? 'até o fim do mês' : `até ${dataCurta(fimMes)}`) : ''}
     </section>
 
     <button class="btn" type="button" id="novo">${icon('plus', 18, 'currentColor', 2)} Novo</button>

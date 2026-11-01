@@ -52,6 +52,8 @@ const ERROS = [
   [/número de parcelas/i, 'Informe o número de parcelas (2 ou mais).'],
   [/conta não encontrada/i, 'Conta não encontrada. Atualize a página.'],
   [/categoria inv/i, 'Categoria inválida. Recarregue a página e tente de novo.'],
+  [/já foi paga/i, 'Esta conta já foi paga. Desfaça o pagamento para editar.'],
+  [/data de vencimento/i, 'Informe a data de vencimento.'],
   [/failed to fetch|networkerror|load failed/i, 'Sem conexão com o servidor. Verifique sua internet.'],
 ];
 

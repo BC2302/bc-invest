@@ -46,6 +46,12 @@ export const vencimentosAtrasados = () =>
 export const vencimentosPorLancamento = (ids) =>
   db.select('vencimentos', `${CAMPOS_VENC}&lancamento_id=in.(${ids.join(',')})`);
 
+// Tudo o que ainda não foi pago até uma data (inclui as atrasadas)
+export async function totalEmAbertoAte(fimISO) {
+  const rows = await db.select('vencimentos', `select=valor&pago_em=is.null&vencimento=lte.${fimISO}`);
+  return { total: rows.reduce((s, v) => s + Number(v.valor), 0), qtd: rows.length };
+}
+
 // Em aberto: atrasadas e as que vencem nos próximos dias
 export const proximosVencimentos = (dias = 7, limite = 4) =>
   db.select('vencimentos', `${CAMPOS_VENC}&pago_em=is.null&vencimento=lte.${addDias(hojeISO(), dias)}&order=vencimento.asc&limit=${limite}`);

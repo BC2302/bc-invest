@@ -17,6 +17,22 @@ export function situacao(v, hojeStr = hojeISO()) {
   return { txt: `Vence ${dataLonga(v.vencimento).slice(0, 5)}`, cls: '' };
 }
 
+// Prévia: o saldo disponível dá para pagar as contas em aberto?
+export function previaHTML(saldo, aberto, rotulo, mask = (t) => t) {
+  const total = aberto.total;
+  const sobra = saldo - total;
+  const falta = sobra < 0;
+  const titulo = total === 0 ? (falta ? 'Saldo negativo' : 'Saldo livre') : falta ? 'Vai faltar' : 'Vai sobrar';
+  const cobre = total > 0 && falta ? Math.max(0, Math.floor((Math.max(saldo, 0) / total) * 100)) : null;
+  return `<div class="previa${falta ? ' falta' : ''}" role="status" aria-label="Prévia das contas">
+    <span class="eyebrow">Prévia ${esc(rotulo)}</span>
+    <div class="previa-linha"><span>Saldo disponível hoje</span><span>${mask(brl(saldo))}</span></div>
+    <div class="previa-linha"><span>Contas a pagar${total ? ` (${aberto.qtd})` : ''}</span><span>${total ? `− ${mask(brl(total))}` : mask(brl(0))}</span></div>
+    <div class="previa-total"><span>${titulo}</span><strong class="${falta ? 'neg' : 'pos'}">${mask(brl(Math.abs(sobra)))}</strong></div>
+    ${cobre != null ? `<p class="fine">Seu saldo cobre ${cobre}% dessas contas. Registre suas receitas para a prévia ficar certa.</p>` : ''}
+  </div>`;
+}
+
 export const nomeVencimento = (v) => v.descricao + (v.parcela ? ` (${v.parcela}/${v.total_parcelas})` : '');
 
 export function painelVencimento(v, conta, cats, recarregar) {
@@ -32,7 +48,7 @@ export function painelVencimento(v, conta, cats, recarregar) {
       : `<button class="btn" type="button" id="pagar">${icon('check', 18, 'currentColor', 2)} Marcar como paga</button>`}
     <p class="fine">${v.pago_em ? 'O pagamento entrou como despesa em Gastos. Ao desfazer, essa despesa é apagada.' : 'Ao marcar como paga, a conta entra automaticamente como despesa em Gastos, com a data de hoje.'}</p>
     <div class="btn-row">
-      <button class="btn outline" type="button" id="editar">${icon('edit', 18)} Editar</button>
+      ${v.pago_em ? '' : `<button class="btn outline" type="button" id="editar">${icon('edit', 18)} Editar valor ou data</button>`}
       <button class="btn danger" type="button" id="excluir">Excluir conta</button>
     </div>
     ${conta?.repeticao === 'mensal' && conta.ativa ? '<button class="link-btn" type="button" id="encerrar">Parar de repetir esta conta</button>' : ''}
@@ -45,7 +61,7 @@ export function painelVencimento(v, conta, cats, recarregar) {
   });
   acao(sheet.querySelector('#pagar'), () => db.rpc('pagar_vencimento', { p_id: v.id }), 'Conta paga. Lançada em Gastos.');
   acao(sheet.querySelector('#desfazer'), () => db.rpc('desfazer_pagamento', { p_id: v.id }), 'Pagamento desfeito.');
-  sheet.querySelector('#editar').addEventListener('click', () => formEditarConta(conta, v, cats, recarregar));
+  sheet.querySelector('#editar')?.addEventListener('click', () => formEditarConta(conta, v, cats, recarregar));
 
   const enc = sheet.querySelector('#encerrar');
   if (enc) {
@@ -68,17 +84,26 @@ export function painelVencimento(v, conta, cats, recarregar) {
 }
 
 function formEditarConta(conta, v, cats, recarregar) {
-  const sheet = openSheet('Editar conta', `
+  const rep = conta?.repeticao || 'unica';
+  const comEscopo = rep !== 'unica';
+  let escopo = 'esta';
+  const sheet = openSheet(`Editar ${nomeVencimento(v)}`, `
     <form class="form" novalidate>
-      <p class="fine">As mudanças valem para ${conta?.repeticao === 'unica' ? 'esta conta' : 'todos os meses/parcelas que ainda não foram pagos'}.</p>
-      <label class="field">Descrição
-        <input name="descricao" maxlength="80" autocomplete="off" value="${esc(conta?.descricao ?? v.descricao)}" required></label>
-      <div class="grid-2">
-        <label class="field">${conta?.repeticao === 'parcelada' ? 'Valor da parcela (R$)' : 'Valor (R$)'}
-          <input name="valor" inputmode="decimal" autocomplete="off" value="${esc(valorInput(conta?.valor ?? v.valor))}" required></label>
-        <label class="field">Categoria
-          <select name="categoria">${opcoesCategoria(cats, 'despesa', conta?.categoria_id ?? v.categoria_id)}</select></label>
+      ${comEscopo ? `<div class="segmented" role="group" aria-label="Aplicar a mudança em">
+        <button type="button" data-escopo="esta" aria-pressed="true">Só esta</button>
+        <button type="button" data-escopo="seguintes" aria-pressed="false">Desta em diante</button>
       </div>
+      <p class="fine" id="escopo-ajuda"></p>` : ''}
+      <div class="grid-2">
+        <label class="field">${rep === 'parcelada' ? 'Valor da parcela (R$)' : 'Valor (R$)'}
+          <input class="big" name="valor" inputmode="decimal" autocomplete="off" value="${esc(valorInput(v.valor))}" required></label>
+        <label class="field">Vencimento
+          <input name="vencimento" type="date" value="${esc(v.vencimento)}" required></label>
+      </div>
+      <label class="field">Descrição
+        <input name="descricao" maxlength="80" autocomplete="off" value="${esc(v.descricao)}" required></label>
+      <label class="field">Categoria
+        <select name="categoria">${opcoesCategoria(cats, 'despesa', v.categoria_id)}</select></label>
       ${campoNovaCategoria()}
       <p class="form-error" role="alert" hidden></p>
       <button class="btn" type="submit">Salvar alterações</button>
@@ -87,18 +112,41 @@ function formEditarConta(conta, v, cats, recarregar) {
   const err = form.querySelector('.form-error');
   const falha = (t) => { err.textContent = t; err.hidden = false; };
   ligarNovaCategoria(form);
+
+  const ajustar = () => {
+    if (!comEscopo) return;
+    sheet.querySelectorAll('[data-escopo]').forEach((x) => x.setAttribute('aria-pressed', String(x.dataset.escopo === escopo)));
+    const dia = Number((form.vencimento.value || '').slice(8, 10));
+    const este = rep === 'parcelada' ? `a parcela ${v.parcela}/${v.total_parcelas}` : 'este mês';
+    sheet.querySelector('#escopo-ajuda').textContent = escopo === 'esta'
+      ? `Muda só ${este}. ${rep === 'parcelada' ? 'As outras parcelas continuam' : 'Os outros meses continuam'} como estão.`
+      : `Muda ${este} e ${rep === 'parcelada' ? 'as próximas parcelas ainda não pagas' : 'os próximos meses ainda não pagos'}.${dia ? ` O vencimento passa a ser todo dia ${dia}.` : ''} O que já foi pago não muda.`;
+  };
+  sheet.querySelectorAll('[data-escopo]').forEach((b) => b.addEventListener('click', () => { escopo = b.dataset.escopo; ajustar(); }));
+  form.vencimento.addEventListener('input', ajustar);
+  ajustar();
+
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     const descricao = form.descricao.value.trim();
     const valor = parseValor(form.valor.value);
-    if (!descricao) return falha('Informe uma descrição.');
+    const data = form.vencimento.value;
     if (!(valor > 0)) return falha('Informe um valor maior que zero.');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(data)) return falha('Informe a data de vencimento.');
+    if (!descricao) return falha('Informe uma descrição.');
+    let n = 1;
     try {
       await busy(form.querySelector('button[type=submit]'), async () => {
         const categoria = await resolverCategoria(form, cats, 'despesa');
-        await db.rpc('editar_conta', { p_id: v.conta_id, p_descricao: descricao, p_valor: valor, p_categoria: categoria });
+        n = await db.rpc('editar_vencimento', {
+          p_id: v.id, p_descricao: descricao, p_valor: valor, p_categoria: categoria, p_vencimento: data, p_escopo: escopo,
+        });
       });
-      closeSheet(); toast('Conta atualizada.'); recarregar();
+      closeSheet();
+      toast(escopo === 'seguintes' && n > 1
+        ? `${n} ${rep === 'parcelada' ? 'parcelas atualizadas' : 'meses atualizados'}.`
+        : 'Conta atualizada.');
+      recarregar();
     } catch (ex) { falha(ex.message?.startsWith('Informe') ? ex.message : mensagemErro(ex)); }
   });
 }
