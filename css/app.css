@@ -319,3 +319,10 @@ a:hover { color: var(--silver-hi); }
 .previa-linha span:last-child, .previa-total strong { white-space: nowrap; }
 .previa-total strong { font-size: 20px; }
 .previa .fine { margin: 0; }
+
+/* Pagos e recebidos: receitas e despesas separadas */
+.lanc-grupo { display: grid; gap: 4px; }
+.lanc-grupo + .lanc-grupo { margin-top: 14px; }
+.h-sub { margin: 0; font-size: 12px; font-weight: 600; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); }
+.section-head.sub .pos { color: var(--pos); }
+.section-head.sub .neg { color: var(--neg); }

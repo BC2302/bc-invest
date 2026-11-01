@@ -81,7 +81,7 @@ export async function renderGastos(root, ctx) {
     </div>`;
   }).join('')}</div>` : '<div class="empty">Nenhuma conta em aberto neste mês.</div>';
 
-  const lancHTML = lancs.length ? `<div class="list">${lancs.map((l) => {
+  const itemLanc = (l) => {
     const cat = catPorId.get(l.categoria_id);
     const rec = l.tipo === 'receita';
     const venc = vencPorLanc.get(l.id);
@@ -91,7 +91,21 @@ export async function renderGastos(root, ctx) {
       <span class="item-sub">${dataCurta(l.data)} · ${esc(cat?.nome || (rec ? 'Receita' : 'Sem categoria'))}${venc ? ' · conta paga' : ''}</span></span>
       <span class="item-value${rec ? ' pos' : ''}">${rec ? '+' : '−'} ${brl(l.valor)}</span>
     </button>`;
-  }).join('')}</div>` : '<div class="empty">Nada pago ou recebido neste mês ainda.</div>';
+  };
+  // Receitas juntas e despesas juntas, cada grupo em ordem de data (dia 1, 2, 3…)
+  const emOrdem = [...lancs].reverse().sort((a, b) => (a.data < b.data ? -1 : a.data > b.data ? 1 : 0));
+  const grupo = (tipo, titulo) => {
+    const ls = emOrdem.filter((l) => l.tipo === tipo);
+    if (!ls.length) return '';
+    const total = ls.reduce((t, l) => t + Number(l.valor), 0);
+    return `<div class="lanc-grupo" data-grupo="${tipo}">
+      <div class="section-head sub"><h3 class="h-sub">${titulo}</h3><span class="small ${tipo === 'receita' ? 'pos' : 'neg'}">${ls.length} · ${brl(total)}</span></div>
+      <div class="list">${ls.map(itemLanc).join('')}</div>
+    </div>`;
+  };
+  const lancHTML = lancs.length
+    ? grupo('receita', 'Receitas') + grupo('despesa', 'Despesas')
+    : '<div class="empty">Nada pago ou recebido neste mês ainda.</div>';
 
   root.innerHTML = `<main class="screen">
     ${topbar('Gastos', { right: `<button class="icon-btn" type="button" id="novo-top" aria-label="Novo lançamento">${icon('plus')}</button>` })}
