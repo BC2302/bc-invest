@@ -10,6 +10,15 @@ export function lancamentosDoMes(ano, mes) {
     `select=id,tipo,descricao,valor,data,categoria_id&data=gte.${inicio}&data=lte.${fim}&order=data.desc,criado_em.desc`);
 }
 
+// Relatório: lançamentos de um ano inteiro e o primeiro ano com dados
+export const lancamentosDoAno = (ano) =>
+  db.select('lancamentos', `select=id,tipo,descricao,valor,data,categoria_id&data=gte.${ano}-01-01&data=lte.${ano}-12-31&order=data.asc`);
+
+export async function primeiroAno() {
+  const rows = await db.select('lancamentos', 'select=data&order=data.asc&limit=1');
+  return rows?.[0] ? Number(rows[0].data.slice(0, 4)) : null;
+}
+
 export const metas = () => db.select('metas', 'select=*&order=is_reserva.desc,criado_em.asc');
 
 // Totais de todos os tempos (para o saldo total disponível)

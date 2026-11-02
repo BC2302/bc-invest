@@ -2,6 +2,7 @@
 import * as data from '../data.js';
 import { db, mensagemErro } from '../supa.js';
 import { cartaoAvisos } from '../push.js';
+import { somaPorCategoria, barrasCategoria } from '../graficos.js';
 import { opcoesCategoria, campoNovaCategoria, ligarNovaCategoria, resolverCategoria } from '../categoria.js';
 import { situacao, nomeVencimento, painelVencimento, previaHTML, REPETICAO } from './contas.js';
 import {
@@ -126,11 +127,19 @@ export async function renderGastos(root, ctx) {
       ${geral && aberto ? previaHTML(geral.saldo, aberto, mesAtual ? 'até o fim do mês' : `até ${dataCurta(fimMes)}`) : ''}
     </section>
 
-    <button class="btn" type="button" id="novo">${icon('plus', 18, 'currentColor', 2)} Novo</button>
+    <div class="btn-row">
+      <button class="btn" type="button" id="novo">${icon('plus', 18, 'currentColor', 2)} Novo</button>
+      <a class="btn outline" href="#/relatorio">${icon('chart', 18)} Relatório</a>
+    </div>
 
     <section class="section">
       <div class="section-head"><h2 class="h-section">A pagar</h2><span class="small">${aPagar.length ? `${aPagar.length} · ${brl(totalAPagar)}` : ''}</span></div>
       ${aPagarHTML}
+    </section>
+
+    <section class="section" aria-label="Gráfico de gastos do mês">
+      <div class="section-head"><h2 class="h-section">Gastos do mês</h2><span class="small">${r.despesas ? brl(r.despesas) : ''}</span></div>
+      ${barrasCategoria(somaPorCategoria(lancs, 'despesa', cats), { tipo: 'despesa', vazio: 'Nenhuma despesa paga neste mês ainda.' })}
     </section>
 
     <section class="section">
