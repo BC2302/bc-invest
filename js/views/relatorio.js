@@ -101,7 +101,7 @@ export async function renderRelatorio(root, ctx) {
       <div class="section-head"><h3 class="h-sub">${MESES_NOMES[m.mes]}</h3>
         <a class="link-btn" href="${link(ano, m.mes)}">Abrir</a></div>
       <div class="mes-linha"><span>Receitas <b class="pos">${brl(m.receitas)}</b></span><span>Despesas <b class="neg">${brl(m.despesas)}</b></span><span>Saldo <b class="${saldo < 0 ? 'neg' : 'pos'}">${brl(saldo)}</b></span></div>
-      ${barrasCategoria(somaPorCategoria(m.lancs, 'despesa', cats), { tipo: 'despesa', max: 4, vazio: 'Nenhuma despesa.' })}
+      ${barrasCategoria(somaPorCategoria(m.lancs, 'despesa', cats), { tipo: 'despesa', vazio: 'Nenhuma despesa.' })}
     </section>`;
   };
 

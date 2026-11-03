@@ -17,8 +17,8 @@ export function somaPorCategoria(lancs, tipo, cats) {
   return [...soma].map(([nome, valor]) => ({ nome, valor })).sort((a, b) => b.valor - a.valor);
 }
 
-// Barras horizontais em ordem (maior primeiro). Passa de `max` itens → junta o resto em "Outras".
-export function barrasCategoria(itens, { tipo = 'despesa', max = 7, vazio = 'Nada registrado.' } = {}) {
+// Barras horizontais em ordem (maior primeiro), todas as categorias. Com `max`, junta o resto em "Outras".
+export function barrasCategoria(itens, { tipo = 'despesa', max = Infinity, vazio = 'Nada registrado.' } = {}) {
   if (!itens.length) return `<div class="empty">${esc(vazio)}</div>`;
   let lista = itens;
   if (itens.length > max) {
