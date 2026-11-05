@@ -2,6 +2,7 @@
 // A lista fica na tela de Gastos.
 import { db, mensagemErro } from '../supa.js';
 import { opcoesCategoria, campoNovaCategoria, ligarNovaCategoria, resolverCategoria } from '../categoria.js';
+import { opcoesCartao } from '../cartao.js';
 import {
   esc, brl, icon, dataLonga, hojeISO, diasEntre, parseValor, valorInput, openSheet, closeSheet, toast, busy,
 } from '../ui.js';
@@ -35,14 +36,15 @@ export function previaHTML(saldo, aberto, rotulo, mask = (t) => t) {
 
 export const nomeVencimento = (v) => v.descricao + (v.parcela ? ` (${v.parcela}/${v.total_parcelas})` : '');
 
-export function painelVencimento(v, conta, cats, recarregar) {
+export function painelVencimento(v, conta, cats, recarregar, cartoes = []) {
+  const cartao = cartoes.find((c) => c.id === conta?.cartao_id);
   const st = situacao(v);
   const cat = cats.find((c) => c.id === v.categoria_id);
   const sheet = openSheet(nomeVencimento(v), `
     <div class="result-box"><span class="eyebrow">${v.pago_em ? `Paga em ${dataLonga(v.pago_em)}` : `Vence em ${dataLonga(v.vencimento)}`}</span>
       <span class="big-number">${brl(v.valor)}</span>
       <span class="chip ${st.cls}">${st.txt}</span></div>
-    <p class="small" style="text-align:center;margin:0">${REPETICAO[conta?.repeticao] || 'Conta'}${conta?.repeticao === 'mensal' ? ` · todo dia ${conta.dia_vencimento}${conta.ativa ? '' : ' (encerrada)'}` : ''}${cat ? ` · ${esc(cat.nome)}` : ''}</p>
+    <p class="small" style="text-align:center;margin:0">${REPETICAO[conta?.repeticao] || 'Conta'}${conta?.repeticao === 'mensal' ? ` · todo dia ${conta.dia_vencimento}${conta.ativa ? '' : ' (encerrada)'}` : ''}${cat ? ` · ${esc(cat.nome)}` : ''}${cartao ? ` · ${esc(cartao.nome)}` : ''}</p>
     ${v.pago_em
       ? '<button class="btn outline" type="button" id="desfazer">Desfazer pagamento</button>'
       : `<button class="btn" type="button" id="pagar">${icon('check', 18, 'currentColor', 2)} Marcar como paga</button>`}
@@ -61,7 +63,7 @@ export function painelVencimento(v, conta, cats, recarregar) {
   });
   acao(sheet.querySelector('#pagar'), () => db.rpc('pagar_vencimento', { p_id: v.id }), 'Conta paga. Lançada em Gastos.');
   acao(sheet.querySelector('#desfazer'), () => db.rpc('desfazer_pagamento', { p_id: v.id }), 'Pagamento desfeito.');
-  sheet.querySelector('#editar')?.addEventListener('click', () => formEditarConta(conta, v, cats, recarregar));
+  sheet.querySelector('#editar')?.addEventListener('click', () => formEditarConta(conta, v, cats, recarregar, cartoes));
 
   const enc = sheet.querySelector('#encerrar');
   if (enc) {
@@ -83,7 +85,7 @@ export function painelVencimento(v, conta, cats, recarregar) {
   });
 }
 
-function formEditarConta(conta, v, cats, recarregar) {
+function formEditarConta(conta, v, cats, recarregar, cartoes = []) {
   const rep = conta?.repeticao || 'unica';
   const comEscopo = rep !== 'unica';
   let escopo = 'esta';
@@ -105,6 +107,8 @@ function formEditarConta(conta, v, cats, recarregar) {
       <label class="field">Categoria
         <select name="categoria">${opcoesCategoria(cats, 'despesa', v.categoria_id)}</select></label>
       ${campoNovaCategoria()}
+      ${cartoes.length ? `<label class="field">Cartão de crédito (vale para a conta toda)
+        <select name="cartao">${opcoesCartao(cartoes, conta?.cartao_id)}</select></label>` : ''}
       <p class="form-error" role="alert" hidden></p>
       <button class="btn" type="submit">Salvar alterações</button>
     </form>`);
@@ -141,6 +145,8 @@ function formEditarConta(conta, v, cats, recarregar) {
         n = await db.rpc('editar_vencimento', {
           p_id: v.id, p_descricao: descricao, p_valor: valor, p_categoria: categoria, p_vencimento: data, p_escopo: escopo,
         });
+        const novoCartao = form.cartao ? (form.cartao.value || null) : undefined;
+        if (novoCartao !== undefined && novoCartao !== (conta?.cartao_id || null)) await db.update('contas', v.conta_id, { cartao_id: novoCartao });
       });
       closeSheet();
       toast(escopo === 'seguintes' && n > 1

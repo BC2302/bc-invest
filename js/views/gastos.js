@@ -3,10 +3,11 @@ import * as data from '../data.js';
 import { db, mensagemErro } from '../supa.js';
 import { cartaoAvisos } from '../push.js';
 import { somaPorCategoria, barrasCategoria } from '../graficos.js';
+import { opcoesCartao, vencimentoDaFatura } from '../cartao.js';
 import { opcoesCategoria, campoNovaCategoria, ligarNovaCategoria, resolverCategoria } from '../categoria.js';
 import { situacao, nomeVencimento, painelVencimento, previaHTML, REPETICAO } from './contas.js';
 import {
-  esc, brl, brlParts, icon, tabbar, topbar, nomeMes, dataCurta, hojeISO, isoDate, limitesMes,
+  esc, brl, brlParts, icon, tabbar, topbar, nomeMes, dataCurta, dataLonga, hojeISO, isoDate, limitesMes,
   parseValor, valorInput, openSheet, closeSheet, toast, busy,
 } from '../ui.js';
 
@@ -20,12 +21,14 @@ export async function renderGastos(root, ctx) {
   const mesAtual = ano === hoje.getFullYear() && mes === hoje.getMonth();
   const futuroOuAtual = ano > hoje.getFullYear() || (ano === hoje.getFullYear() && mes >= hoje.getMonth());
   const fimMes = limitesMes(ano, mes).fim;
-  const [cats, contas, lancs, vencsMes, atrasadas, geral, aberto] = await Promise.all([
+  const [cats, contas, lancs, vencsMes, atrasadas, geral, aberto, cartoes] = await Promise.all([
     data.categorias(), data.contas(), data.lancamentosDoMes(ano, mes), data.vencimentosDoMes(ano, mes),
     mesAtual ? data.vencimentosAtrasados() : Promise.resolve([]),
     futuroOuAtual ? data.resumoGeral().catch(() => null) : null,
     futuroOuAtual ? data.totalEmAbertoAte(fimMes).catch(() => null) : null,
+    data.cartoes().catch(() => []),
   ]);
+  const nomeCartao = new Map(cartoes.map((c) => [c.id, c.nome]));
   // contas pagas cujo pagamento caiu neste mês (para ligar o lançamento à conta)
   const pagas = lancs.length ? await data.vencimentosPorLancamento(lancs.map((l) => l.id)) : [];
   if (!ctx.alive()) return;
@@ -75,7 +78,7 @@ export async function renderGastos(root, ctx) {
       <button class="item-main" type="button" data-venc="${esc(v.id)}">
         <span class="item-icon ${st.cls}">${icon('calendar', 18, 'currentColor', 1.6)}</span>
         <span class="item-body"><span class="item-title">${esc(nomeVencimento(v))}</span>
-        <span class="item-sub"><span class="${st.cls}">${st.txt}</span> · ${REPETICAO[conta?.repeticao] || 'Conta'}${cat ? ` · ${esc(cat.nome)}` : ''}</span></span>
+        <span class="item-sub"><span class="${st.cls}">${st.txt}</span> · ${REPETICAO[conta?.repeticao] || 'Conta'}${cat ? ` · ${esc(cat.nome)}` : ''}${conta?.cartao_id && nomeCartao.has(conta.cartao_id) ? ` · ${esc(nomeCartao.get(conta.cartao_id))}` : ''}</span></span>
         <span class="item-value">${brl(v.valor)}</span>
       </button>
       <button class="pay-btn" type="button" data-pagar="${esc(v.id)}" aria-label="Pagar ${esc(nomeVencimento(v))}">Pagar</button>
@@ -89,7 +92,7 @@ export async function renderGastos(root, ctx) {
     return `<button class="item" type="button" data-lanc="${esc(l.id)}">
       <span class="item-icon ${rec ? 'pos' : 'neg'}">${icon(rec ? 'up' : venc ? 'check' : 'down', 18, 'currentColor', 1.6)}</span>
       <span class="item-body"><span class="item-title">${esc(l.descricao)}</span>
-      <span class="item-sub">${dataCurta(l.data)} · ${esc(cat?.nome || (rec ? 'Receita' : 'Sem categoria'))}${venc ? ' · conta paga' : ''}</span></span>
+      <span class="item-sub">${dataCurta(l.data)} · ${esc(cat?.nome || (rec ? 'Receita' : 'Sem categoria'))}${l.cartao_id && nomeCartao.has(l.cartao_id) ? ` · ${esc(nomeCartao.get(l.cartao_id))}` : ''}${venc ? ' · conta paga' : ''}</span></span>
       <span class="item-value${rec ? ' pos' : ''}">${rec ? '+' : '−'} ${brl(l.valor)}</span>
     </button>`;
   };
@@ -160,14 +163,14 @@ export async function renderGastos(root, ctx) {
   const recarregar = () => renderGastos(root, ctx);
   root.querySelector('#mes-ant').addEventListener('click', () => { if (--mes < 0) { mes = 11; ano--; } recarregar(); });
   root.querySelector('#mes-prox').addEventListener('click', () => { if (++mes > 11) { mes = 0; ano++; } recarregar(); });
-  root.querySelector('#novo').addEventListener('click', () => formLancamento(null, cats, recarregar));
-  root.querySelector('#novo-top').addEventListener('click', () => formLancamento(null, cats, recarregar));
+  root.querySelector('#novo').addEventListener('click', () => formLancamento(null, cats, recarregar, cartoes));
+  root.querySelector('#novo-top').addEventListener('click', () => formLancamento(null, cats, recarregar, cartoes));
   root.querySelector('#editar-cats').addEventListener('click', () => formCategorias(cats, recarregar));
 
   const todasVencs = [...aPagar, ...pagas];
   root.querySelectorAll('[data-venc]').forEach((b) => b.addEventListener('click', () => {
     const v = todasVencs.find((x) => x.id === b.dataset.venc);
-    painelVencimento(v, contaPorId.get(v.conta_id), cats, recarregar);
+    painelVencimento(v, contaPorId.get(v.conta_id), cats, recarregar, cartoes);
   }));
   root.querySelectorAll('[data-pagar]').forEach((b) => b.addEventListener('click', async () => {
     try {
@@ -180,8 +183,8 @@ export async function renderGastos(root, ctx) {
     const l = lancs.find((x) => x.id === b.dataset.lanc);
     const venc = vencPorLanc.get(l.id);
     // pagamento de conta: abre a conta (para desfazer o pagamento, editar etc.)
-    if (venc) painelVencimento(venc, contaPorId.get(venc.conta_id), cats, recarregar);
-    else formLancamento(l, cats, recarregar);
+    if (venc) painelVencimento(venc, contaPorId.get(venc.conta_id), cats, recarregar, cartoes);
+    else formLancamento(l, cats, recarregar, cartoes);
   }));
 }
 
@@ -192,10 +195,11 @@ function dataPadrao() {
 
 // Novo: despesa já paga, receita, ou conta a pagar (única, mensal ou parcelada).
 // Editar: só lançamentos já pagos/recebidos.
-function formLancamento(lanc, cats, recarregar) {
+function formLancamento(lanc, cats, recarregar, cartoes = []) {
   let tipo = lanc?.tipo || 'despesa';
   let situ = 'pago';      // 'pago' | 'apagar'
   let rep = 'unica';      // 'unica' | 'mensal' | 'parcelada'
+  let dataMexida = false;
   const opcoes = (t) => opcoesCategoria(cats, t, lanc?.categoria_id);
 
   const sheet = openSheet(lanc ? 'Editar lançamento' : 'Novo', `
@@ -229,6 +233,9 @@ function formLancamento(lanc, cats, recarregar) {
           <input name="data" type="date" value="${esc(lanc?.data || dataPadrao())}" required></label>
       </div>
       ${campoNovaCategoria()}
+      ${cartoes.length ? `<label class="field" id="campo-cartao">Cartão de crédito
+        <select name="cartao">${opcoesCartao(cartoes, lanc?.cartao_id)}</select></label>` : ''}
+      <p class="fine" id="cartao-ajuda" hidden></p>
       <p class="form-error" role="alert" hidden></p>
       <button class="btn" type="submit" id="salvar">${lanc ? 'Salvar alterações' : 'Adicionar'}</button>
       ${lanc ? '<button class="btn danger" type="button" id="excluir">Excluir lançamento</button>' : ''}
@@ -242,6 +249,17 @@ function formLancamento(lanc, cats, recarregar) {
 
   const ajustar = () => {
     sheet.querySelectorAll('[data-tipo]').forEach((x) => x.setAttribute('aria-pressed', String(x.dataset.tipo === tipo)));
+    const campoCartao = form.querySelector('#campo-cartao');
+    if (campoCartao) campoCartao.hidden = tipo !== 'despesa';
+    const cartaoSel = tipo === 'despesa' ? cartoes.find((c) => c.id === form.cartao?.value) : null;
+    const ajudaCartao = form.querySelector('#cartao-ajuda');
+    ajudaCartao.hidden = !cartaoSel;
+    if (cartaoSel) {
+      const naFatura = tipo === 'despesa' && situ === 'apagar' && !lanc;
+      ajudaCartao.textContent = naFatura
+        ? { unica: `Ocupa o limite do ${cartaoSel.nome} até você marcar como paga.`, mensal: `A cobrança de cada mês ocupa o limite do ${cartaoSel.nome} até ser marcada como paga.`, parcelada: `As parcelas em aberto ocupam o limite do ${cartaoSel.nome} até cada uma ser marcada como paga.` }[rep]
+        : `Ocupa o limite do ${cartaoSel.nome} até o vencimento da fatura${/^\d{4}-\d{2}-\d{2}$/.test(form.data.value) ? ` (${dataLonga(vencimentoDaFatura(form.data.value, cartaoSel.dia_fechamento, cartaoSel.dia_vencimento))})` : ''}.`;
+    }
     if (lanc) return;
     const apagar = tipo === 'despesa' && situ === 'apagar';
     sheet.querySelector('#grp-situ').hidden = tipo !== 'despesa';
@@ -271,6 +289,17 @@ function formLancamento(lanc, cats, recarregar) {
   sheet.querySelectorAll('[data-situ]').forEach((b) => b.addEventListener('click', () => { situ = b.dataset.situ; ajustar(); }));
   sheet.querySelectorAll('[data-rep]').forEach((b) => b.addEventListener('click', () => { rep = b.dataset.rep; ajustar(); }));
   form.data.addEventListener('change', ajustar);
+  form.data.addEventListener('input', () => { dataMexida = true; });
+  // conta a pagar no cartão: sugere o vencimento da fatura
+  const sugerirData = () => {
+    const c = cartoes.find((x) => x.id === form.cartao?.value);
+    if (!lanc && c && tipo === 'despesa' && situ === 'apagar' && !dataMexida) {
+      form.data.value = vencimentoDaFatura(hojeISO(), c.dia_fechamento, c.dia_vencimento);
+    }
+    ajustar();
+  };
+  form.cartao?.addEventListener('change', sugerirData);
+  sheet.querySelectorAll('[data-situ]').forEach((b) => b.addEventListener('click', sugerirData));
   ajustar();
 
   form.addEventListener('submit', async (e) => {
@@ -280,6 +309,7 @@ function formLancamento(lanc, cats, recarregar) {
     const dataISO = form.data.value;
     const apagar = !lanc && tipo === 'despesa' && situ === 'apagar';
     const parcelas = apagar && rep === 'parcelada' ? Number(form.parcelas.value) : null;
+    const cartaoId = tipo === 'despesa' ? (form.cartao?.value || null) : null;
     if (!(valor > 0)) return falha('Informe um valor maior que zero.');
     if (valor > 999999999999) return falha('Valor muito alto.');
     if (!descricao) return falha('Informe uma descrição.');
@@ -289,11 +319,13 @@ function formLancamento(lanc, cats, recarregar) {
       await busy(form.querySelector('button[type=submit]'), async () => {
         const categoria = await resolverCategoria(form, cats, tipo);
         if (apagar) {
-          return db.rpc('criar_conta', {
+          const id = await db.rpc('criar_conta', {
             p_descricao: descricao, p_valor: valor, p_categoria: categoria, p_repeticao: rep, p_inicio: dataISO, p_parcelas: parcelas,
           });
+          if (cartaoId && id) await db.update('contas', id, { cartao_id: cartaoId });
+          return id;
         }
-        const row = { tipo, valor, descricao, data: dataISO, categoria_id: categoria };
+        const row = { tipo, valor, descricao, data: dataISO, categoria_id: categoria, cartao_id: cartaoId };
         return lanc ? db.update('lancamentos', lanc.id, row) : db.insert('lancamentos', row);
       });
       closeSheet();

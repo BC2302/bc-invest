@@ -369,3 +369,20 @@ a:hover { color: var(--silver-hi); }
 .mes-card + .mes-card { margin-top: 12px; }
 .mes-linha { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12px; color: var(--muted); }
 .mes-linha b { font-weight: 600; }
+
+/* ---------- Cartões ---------- */
+.bar.limite { height: 8px; border-radius: 4px; }
+.bar.limite > span { border-radius: 4px; background: #C9CCD1; }
+.bar.limite.alerta > span { background: var(--warn); }
+.bar.limite.over > span { background: var(--neg); }
+.lista-cartoes { display: grid; gap: 12px; }
+.cartao-item .goal-name { display: inline-flex; align-items: center; gap: 8px; font-size: 19px; }
+.cartao-linha { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; color: var(--muted); }
+.cartao-linha b { color: var(--text-2); font-weight: 600; }
+.cartao-linha b.pos { color: var(--pos); }
+.cartao-linha b.neg { color: var(--neg); }
+.cartoes-resumo { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap;
+  border: 1px solid var(--line-2); padding: 12px 14px; color: var(--text-2); text-decoration: none; font-size: 13px; }
+.cartoes-resumo > span:first-child { display: inline-flex; align-items: center; gap: 8px; color: var(--muted); }
+.cartoes-resumo b { font-size: 15px; }
+.cartoes-resumo:hover { border-color: var(--silver); }

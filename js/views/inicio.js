@@ -2,6 +2,7 @@
 import * as data from '../data.js';
 import { esc, brl, brlParts, icon, tabbar, nomeMes, dataLonga, limitesMes } from '../ui.js';
 import { situacao, nomeVencimento, previaHTML } from './contas.js';
+import { calcularUso } from '../cartao.js';
 
 const DICAS = [
   'Antes de investir no longo prazo, monte sua reserva de emergência: o recomendado costuma ser de 6 a 12 meses do seu custo de vida.',
@@ -24,7 +25,7 @@ const SISTEMAS = [
   { id: 'gastos', nome: 'Gastos', ic: 'wallet' },
   { id: 'metas', nome: 'Metas', ic: 'target' },
   { id: 'simulador', nome: 'Simuladores', ic: 'calc' },
-  { nome: 'Carteira', ic: 'pie' },
+  { id: 'cartoes', nome: 'Cartões', ic: 'card' },
   { nome: 'Aprender', ic: 'book' },
   { nome: 'Notícias', ic: 'news' },
 ];
@@ -37,13 +38,15 @@ export async function renderInicio(root, ctx) {
   root.innerHTML = `<main class="screen"><div class="loading">Carregando…</div></main>${tabbar('inicio')}`;
 
   const hoje = new Date();
-  const [lancs, metas, geral, proximos, aberto] = await Promise.all([
+  const [lancs, metas, geral, proximos, aberto, cartoesDados] = await Promise.all([
     data.lancamentosDoMes(hoje.getFullYear(), hoje.getMonth()),
     data.metas(),
     data.resumoGeral(),
     data.proximosVencimentos().catch(() => []),
     data.totalEmAbertoAte(limitesMes(hoje.getFullYear(), hoje.getMonth()).fim).catch(() => null),
+    data.dadosCartoes().catch(() => null),
   ]);
+  const usoCartoes = cartoesDados?.cartoes.length ? calcularUso(cartoesDados) : null;
   if (!ctx.alive()) return;
 
   const r = data.resumo(lancs);
@@ -83,6 +86,10 @@ export async function renderInicio(root, ctx) {
         <div class="stat"><span class="stat-label">Lançamentos no mês</span><span class="stat-value">${lancs.length}</span></div>
       </div>
       ${aberto ? previaHTML(geral.saldo, aberto, `até o fim de ${mesAtual.toLowerCase()}`, mask) : ''}
+      ${usoCartoes ? `<a class="cartoes-resumo" href="#/cartoes">
+        <span>${icon('card', 18)} Limite disponível nos cartões</span>
+        <span class="${usoCartoes.disponivel < 0 ? 'neg' : ''}"><b>${mask(brl(usoCartoes.disponivel))}</b> <span class="small">de ${mask(brl(usoCartoes.limite))}</span></span>
+      </a>` : ''}
     </section>
 
     ${proximos.length ? `<section class="section">

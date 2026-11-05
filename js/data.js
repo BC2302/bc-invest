@@ -7,7 +7,7 @@ export const categorias = () => db.select('categorias', 'select=id,nome,tipo,orc
 export function lancamentosDoMes(ano, mes) {
   const { inicio, fim } = limitesMes(ano, mes);
   return db.select('lancamentos',
-    `select=id,tipo,descricao,valor,data,categoria_id&data=gte.${inicio}&data=lte.${fim}&order=data.desc,criado_em.desc`);
+    `select=id,tipo,descricao,valor,data,categoria_id,cartao_id&data=gte.${inicio}&data=lte.${fim}&order=data.desc,criado_em.desc`);
 }
 
 // Relatório: lançamentos de um ano inteiro e o primeiro ano com dados
@@ -40,7 +40,7 @@ export function resumo(lancs) {
 }
 
 // ---------- Contas a pagar ----------
-export const contas = () => db.select('contas', 'select=id,descricao,valor,categoria_id,repeticao,dia_vencimento,parcelas,ativa');
+export const contas = () => db.select('contas', 'select=id,descricao,valor,categoria_id,repeticao,dia_vencimento,parcelas,ativa,cartao_id');
 
 const CAMPOS_VENC = 'select=id,conta_id,descricao,valor,categoria_id,vencimento,parcela,total_parcelas,pago_em,lancamento_id';
 
@@ -64,3 +64,21 @@ export async function totalEmAbertoAte(fimISO) {
 // Em aberto: atrasadas e as que vencem nos próximos dias
 export const proximosVencimentos = (dias = 7, limite = 4) =>
   db.select('vencimentos', `${CAMPOS_VENC}&pago_em=is.null&vencimento=lte.${addDias(hojeISO(), dias)}&order=vencimento.asc&limit=${limite}`);
+
+// ---------- Cartões de crédito ----------
+export const cartoes = () => db.select('cartoes', 'select=id,nome,limite,dia_fechamento,dia_vencimento&order=nome.asc');
+
+// Tudo o que pode estar ocupando o limite dos cartões
+export async function dadosCartoes() {
+  const lista = await cartoes();
+  if (!lista.length) return { cartoes: [], lancs: [], contas: [], vencs: [] };
+  const desde = addDias(hojeISO(), -75);
+  const [lancs, cts] = await Promise.all([
+    db.select('lancamentos', `select=id,descricao,valor,data,cartao_id&cartao_id=not.is.null&tipo=eq.despesa&data=gte.${desde}`),
+    db.select('contas', 'select=id,descricao,repeticao,cartao_id&cartao_id=not.is.null'),
+  ]);
+  const vencs = cts.length
+    ? await db.select('vencimentos', `${CAMPOS_VENC}&pago_em=is.null&conta_id=in.(${cts.map((c) => c.id).join(',')})&order=vencimento.asc`)
+    : [];
+  return { cartoes: lista, lancs, contas: cts, vencs };
+}
