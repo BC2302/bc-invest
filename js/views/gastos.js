@@ -5,7 +5,7 @@ import { cartaoAvisos } from '../push.js';
 import { somaPorCategoria, barrasCategoria } from '../graficos.js';
 import { opcoesCartao, vencimentoDaFatura } from '../cartao.js';
 import { opcoesCategoria, campoNovaCategoria, ligarNovaCategoria, resolverCategoria } from '../categoria.js';
-import { situacao, nomeVencimento, painelVencimento, previaHTML, REPETICAO } from './contas.js';
+import { situacao, nomeVencimento, painelVencimento, previaHTML, formReceber, ehReceita, REPETICAO } from './contas.js';
 import {
   esc, brl, brlParts, icon, tabbar, topbar, nomeMes, dataCurta, dataLonga, hojeISO, isoDate, limitesMes,
   parseValor, valorInput, openSheet, closeSheet, toast, busy,
@@ -40,7 +40,11 @@ export async function renderGastos(root, ctx) {
   const { inicio } = limitesMes(ano, mes);
 
   // A pagar: atrasadas de meses anteriores (só no mês atual) + em aberto do mês
-  const aPagar = [...atrasadas.filter((v) => v.vencimento < inicio), ...vencsMes.filter((v) => !v.pago_em)];
+  const emAberto = [...atrasadas.filter((v) => v.vencimento < inicio), ...vencsMes.filter((v) => !v.pago_em)];
+  const aPagar = emAberto.filter((v) => !ehReceita(v));
+  // A receber: receitas previstas (ex.: salário) que ainda não caíram
+  const aReceber = emAberto.filter(ehReceita);
+  const totalAReceber = aReceber.reduce((s, v) => s + Number(v.valor), 0);
   const totalAPagar = aPagar.reduce((s, v) => s + Number(v.valor), 0);
   const [inteiro, cents] = brlParts(r.saldo);
 
@@ -85,6 +89,21 @@ export async function renderGastos(root, ctx) {
     </div>`;
   }).join('')}</div>` : '<div class="empty">Nenhuma conta em aberto neste mês.</div>';
 
+  const aReceberHTML = aReceber.map((v) => {
+    const st = situacao(v);
+    const conta = contaPorId.get(v.conta_id);
+    const cat = catPorId.get(v.categoria_id);
+    return `<div class="item item-row">
+      <button class="item-main" type="button" data-venc="${esc(v.id)}">
+        <span class="item-icon pos">${icon('up', 18, 'currentColor', 1.6)}</span>
+        <span class="item-body"><span class="item-title">${esc(nomeVencimento(v))}</span>
+        <span class="item-sub"><span class="${st.cls}">${st.txt}</span> · ${REPETICAO[conta?.repeticao] || 'Receita'}${cat ? ` · ${esc(cat.nome)}` : ''}</span></span>
+        <span class="item-value pos">+ ${brl(v.valor)}</span>
+      </button>
+      <button class="pay-btn" type="button" data-receber="${esc(v.id)}" aria-label="Recebi ${esc(nomeVencimento(v))}">Recebi</button>
+    </div>`;
+  }).join('');
+
   const itemLanc = (l) => {
     const cat = catPorId.get(l.categoria_id);
     const rec = l.tipo === 'receita';
@@ -92,7 +111,7 @@ export async function renderGastos(root, ctx) {
     return `<button class="item" type="button" data-lanc="${esc(l.id)}">
       <span class="item-icon ${rec ? 'pos' : 'neg'}">${icon(rec ? 'up' : venc ? 'check' : 'down', 18, 'currentColor', 1.6)}</span>
       <span class="item-body"><span class="item-title">${esc(l.descricao)}</span>
-      <span class="item-sub">${dataCurta(l.data)} · ${esc(cat?.nome || (rec ? 'Receita' : 'Sem categoria'))}${l.cartao_id && nomeCartao.has(l.cartao_id) ? ` · ${esc(nomeCartao.get(l.cartao_id))}` : ''}${venc ? ' · conta paga' : ''}</span></span>
+      <span class="item-sub">${dataCurta(l.data)} · ${esc(cat?.nome || (rec ? 'Receita' : 'Sem categoria'))}${l.cartao_id && nomeCartao.has(l.cartao_id) ? ` · ${esc(nomeCartao.get(l.cartao_id))}` : ''}${venc ? (rec ? ' · recebido' : ' · conta paga') : ''}</span></span>
       <span class="item-value${rec ? ' pos' : ''}">${rec ? '+' : '−'} ${brl(l.valor)}</span>
     </button>`;
   };
@@ -135,6 +154,11 @@ export async function renderGastos(root, ctx) {
       <a class="btn outline" href="#/relatorio">${icon('chart', 18)} Relatório</a>
     </div>
 
+    ${aReceber.length ? `<section class="section">
+      <div class="section-head"><h2 class="h-section">A receber</h2><span class="small pos">${aReceber.length} · ${brl(totalAReceber)}</span></div>
+      <div class="list">${aReceberHTML}</div>
+    </section>` : ''}
+
     <section class="section">
       <div class="section-head"><h2 class="h-section">A pagar</h2><span class="small">${aPagar.length ? `${aPagar.length} · ${brl(totalAPagar)}` : ''}</span></div>
       ${aPagarHTML}
@@ -167,10 +191,13 @@ export async function renderGastos(root, ctx) {
   root.querySelector('#novo-top').addEventListener('click', () => formLancamento(null, cats, recarregar, cartoes));
   root.querySelector('#editar-cats').addEventListener('click', () => formCategorias(cats, recarregar));
 
-  const todasVencs = [...aPagar, ...pagas];
+  const todasVencs = [...aPagar, ...aReceber, ...pagas];
   root.querySelectorAll('[data-venc]').forEach((b) => b.addEventListener('click', () => {
     const v = todasVencs.find((x) => x.id === b.dataset.venc);
     painelVencimento(v, contaPorId.get(v.conta_id), cats, recarregar, cartoes);
+  }));
+  root.querySelectorAll('[data-receber]').forEach((b) => b.addEventListener('click', () => {
+    formReceber(aReceber.find((x) => x.id === b.dataset.receber), recarregar);
   }));
   root.querySelectorAll('[data-pagar]').forEach((b) => b.addEventListener('click', async () => {
     try {
@@ -261,23 +288,34 @@ function formLancamento(lanc, cats, recarregar, cartoes = []) {
         : `Ocupa o limite do ${cartaoSel.nome} até o vencimento da fatura${/^\d{4}-\d{2}-\d{2}$/.test(form.data.value) ? ` (${dataLonga(vencimentoDaFatura(form.data.value, cartaoSel.dia_fechamento, cartaoSel.dia_vencimento))})` : ''}.`;
     }
     if (lanc) return;
-    const apagar = tipo === 'despesa' && situ === 'apagar';
-    sheet.querySelector('#grp-situ').hidden = tipo !== 'despesa';
+    const rec = tipo === 'receita';
+    if (rec && rep === 'parcelada') rep = 'unica';
+    const apagar = situ === 'apagar';
+    const bSitu = sheet.querySelectorAll('[data-situ]');
+    bSitu[0].textContent = rec ? 'Já recebi' : 'Já paguei';
+    bSitu[1].textContent = rec ? 'Vou receber' : 'Vou pagar';
+    sheet.querySelector('[data-rep="parcelada"]').hidden = rec;
+    sheet.querySelector('#grp-rep').classList.toggle('three', !rec);
     sheet.querySelectorAll('[data-situ]').forEach((x) => x.setAttribute('aria-pressed', String(x.dataset.situ === situ)));
     sheet.querySelector('#grp-rep').hidden = !apagar;
     sheet.querySelectorAll('[data-rep]').forEach((x) => x.setAttribute('aria-pressed', String(x.dataset.rep === rep)));
     form.querySelector('#campo-parcelas').hidden = !(apagar && rep === 'parcelada');
     form.querySelector('#lbl-valor').textContent = apagar && rep === 'parcelada' ? 'Valor da parcela (R$)' : 'Valor (R$)';
-    form.querySelector('#lbl-data').textContent = !apagar ? 'Data' : rep === 'unica' ? 'Vencimento' : rep === 'mensal' ? 'Primeiro vencimento' : 'Vencimento da 1ª parcela';
+    form.querySelector('#lbl-data').textContent = !apagar ? 'Data'
+      : rec ? (rep === 'mensal' ? 'Primeiro recebimento' : 'Data prevista')
+        : rep === 'unica' ? 'Vencimento' : rep === 'mensal' ? 'Primeiro vencimento' : 'Vencimento da 1ª parcela';
     const dia = Number((form.data.value || '').slice(8, 10));
     const ajuda = form.querySelector('#rep-ajuda');
     ajuda.hidden = !apagar;
-    ajuda.textContent = {
+    ajuda.textContent = rec ? {
+      unica: 'Fica em "A receber" até você tocar em "Recebi". A prévia já conta com esse valor.',
+      mensal: `Ideal para salário: aparece todo mês${dia ? ` no dia ${dia}` : ''} em "A receber" até você tocar em "Recebi". A prévia já conta com ele.`,
+    }[rep] : {
       unica: 'Fica em "A pagar" até você marcar como paga. Você recebe avisos antes e depois do vencimento.',
       mensal: `Repete todo mês${dia ? ` no dia ${dia}` : ''}, até você parar de repetir.`,
       parcelada: `Uma parcela por mês${dia ? `, sempre no dia ${dia}` : ''}.`,
     }[rep];
-    form.querySelector('#salvar').textContent = apagar ? 'Salvar conta a pagar' : 'Adicionar';
+    form.querySelector('#salvar').textContent = !apagar ? 'Adicionar' : rec ? 'Salvar receita a receber' : 'Salvar conta a pagar';
   };
 
   sheet.querySelectorAll('[data-tipo]').forEach((b) => b.addEventListener('click', () => {
@@ -307,7 +345,7 @@ function formLancamento(lanc, cats, recarregar, cartoes = []) {
     const valor = parseValor(form.valor.value);
     const descricao = form.descricao.value.trim();
     const dataISO = form.data.value;
-    const apagar = !lanc && tipo === 'despesa' && situ === 'apagar';
+    const apagar = !lanc && situ === 'apagar';
     const parcelas = apagar && rep === 'parcelada' ? Number(form.parcelas.value) : null;
     const cartaoId = tipo === 'despesa' ? (form.cartao?.value || null) : null;
     if (!(valor > 0)) return falha('Informe um valor maior que zero.');
@@ -320,7 +358,7 @@ function formLancamento(lanc, cats, recarregar, cartoes = []) {
         const categoria = await resolverCategoria(form, cats, tipo);
         if (apagar) {
           const id = await db.rpc('criar_conta', {
-            p_descricao: descricao, p_valor: valor, p_categoria: categoria, p_repeticao: rep, p_inicio: dataISO, p_parcelas: parcelas,
+            p_descricao: descricao, p_valor: valor, p_categoria: categoria, p_repeticao: rep, p_inicio: dataISO, p_parcelas: parcelas, p_tipo: tipo,
           });
           if (cartaoId && id) await db.update('contas', id, { cartao_id: cartaoId });
           return id;
@@ -329,7 +367,7 @@ function formLancamento(lanc, cats, recarregar, cartoes = []) {
         return lanc ? db.update('lancamentos', lanc.id, row) : db.insert('lancamentos', row);
       });
       closeSheet();
-      toast(lanc ? 'Lançamento atualizado.' : apagar ? 'Conta a pagar cadastrada.' : 'Lançamento adicionado.');
+      toast(lanc ? 'Lançamento atualizado.' : apagar ? (tipo === 'receita' ? 'Receita a receber cadastrada.' : 'Conta a pagar cadastrada.') : 'Lançamento adicionado.');
       recarregar();
     } catch (ex) { falha(ex.message?.startsWith('Informe') ? ex.message : mensagemErro(ex)); }
   });

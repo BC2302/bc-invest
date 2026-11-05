@@ -42,7 +42,7 @@ export function resumo(lancs) {
 // ---------- Contas a pagar ----------
 export const contas = () => db.select('contas', 'select=id,descricao,valor,categoria_id,repeticao,dia_vencimento,parcelas,ativa,cartao_id');
 
-const CAMPOS_VENC = 'select=id,conta_id,descricao,valor,categoria_id,vencimento,parcela,total_parcelas,pago_em,lancamento_id';
+const CAMPOS_VENC = 'select=id,conta_id,descricao,valor,categoria_id,vencimento,parcela,total_parcelas,pago_em,lancamento_id,tipo';
 
 export function vencimentosDoMes(ano, mes) {
   const { inicio, fim } = limitesMes(ano, mes);
@@ -57,13 +57,15 @@ export const vencimentosPorLancamento = (ids) =>
 
 // Tudo o que ainda não foi pago até uma data (inclui as atrasadas)
 export async function totalEmAbertoAte(fimISO) {
-  const rows = await db.select('vencimentos', `select=valor&pago_em=is.null&vencimento=lte.${fimISO}`);
-  return { total: rows.reduce((s, v) => s + Number(v.valor), 0), qtd: rows.length };
+  const rows = await db.select('vencimentos', `select=valor,tipo&pago_em=is.null&vencimento=lte.${fimISO}`);
+  const soma = (t) => rows.filter((v) => (v.tipo || 'despesa') === t).reduce((s, v) => s + Number(v.valor), 0);
+  const conta = (t) => rows.filter((v) => (v.tipo || 'despesa') === t).length;
+  return { total: soma('despesa'), qtd: conta('despesa'), receber: soma('receita'), qtdReceber: conta('receita') };
 }
 
 // Em aberto: atrasadas e as que vencem nos próximos dias
 export const proximosVencimentos = (dias = 7, limite = 4) =>
-  db.select('vencimentos', `${CAMPOS_VENC}&pago_em=is.null&vencimento=lte.${addDias(hojeISO(), dias)}&order=vencimento.asc&limit=${limite}`);
+  db.select('vencimentos', `${CAMPOS_VENC}&pago_em=is.null&tipo=eq.despesa&vencimento=lte.${addDias(hojeISO(), dias)}&order=vencimento.asc&limit=${limite}`);
 
 // ---------- Cartões de crédito ----------
 export const cartoes = () => db.select('cartoes', 'select=id,nome,limite,dia_fechamento,dia_vencimento&order=nome.asc');
