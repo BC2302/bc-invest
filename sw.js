@@ -1,6 +1,6 @@
 // Service worker: deixa o app abrir rápido e instalável.
 // Dados financeiros nunca são guardados em cache — só os arquivos do app.
-const CACHE = 'bcinvest-v14';
+const CACHE = 'bcinvest-v15';
 const ARQUIVOS = [
   './', 'index.html', 'css/app.css', 'manifest.webmanifest',
   'js/app.js', 'js/config.js', 'js/supa.js', 'js/ui.js', 'js/data.js', 'js/push.js', 'js/categoria.js', 'js/graficos.js', 'js/cartao.js', 'js/parcelas.js',

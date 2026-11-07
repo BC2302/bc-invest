@@ -1,7 +1,7 @@
 // Gráficos simples em HTML/CSS/SVG (sem bibliotecas), com escolha do tipo de gráfico.
 // Cores validadas para o fundo escuro: receitas = azul, despesas = laranja;
 // gráficos com várias categorias usam 8 cores fixas (validadas para daltonismo) + cinza para "Outras".
-import { esc, brl } from './ui.js';
+import { esc, brl, dataCurta, openSheet } from './ui.js';
 
 const MESES_CURTOS = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
 export const MESES_NOMES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
@@ -19,17 +19,33 @@ function salvarPref(chave, v) { try { localStorage.setItem(`bcinvest.graf.${chav
 const seletor = (tipos, atual) => `<div class="graf-tipos" role="group" aria-label="Tipo de gráfico">${tipos
   .map(([k, n]) => `<button type="button" data-graf-tipo="${k}" aria-pressed="${k === atual}">${n}</button>`).join('')}</div>`;
 
-// Soma por categoria: [{ nome, valor }] do maior para o menor
+// Soma por categoria: [{ nome, valor, lancs }] do maior para o menor.
+// lancs = itens da categoria (d = data, t = descrição, v = valor), em ordem de data.
 export function somaPorCategoria(lancs, tipo, cats) {
   const porId = new Map(cats.map((c) => [c.id, c.nome]));
   const soma = new Map();
   for (const l of lancs) {
     if (l.tipo !== tipo) continue;
     const nome = porId.get(l.categoria_id) || (tipo === 'receita' ? 'Outras receitas' : 'Sem categoria');
-    soma.set(nome, (soma.get(nome) || 0) + Number(l.valor));
+    const g = soma.get(nome) || { nome, valor: 0, lancs: [] };
+    g.valor += Number(l.valor);
+    g.lancs.push({ d: l.data, t: l.descricao, v: Number(l.valor) });
+    soma.set(nome, g);
   }
-  return [...soma].map(([nome, valor]) => ({ nome, valor })).sort((a, b) => b.valor - a.valor);
+  const porData = (a, b) => (a.d < b.d ? -1 : a.d > b.d ? 1 : 0);
+  return [...soma.values()].map((g) => ({ ...g, lancs: g.lancs.sort(porData) })).sort((a, b) => b.valor - a.valor);
 }
+
+// Pizza e empilhada: até 8 cores; o resto vira "Outras (n)" (com os itens de todas elas juntos)
+function agruparOutras(itens) {
+  if (itens.length <= CORES.length) return itens;
+  const resto = itens.slice(CORES.length - 1);
+  return [...itens.slice(0, CORES.length - 1), {
+    nome: `Outras (${resto.length})`, valor: resto.reduce((s, i) => s + i.valor, 0), outras: true,
+    lancs: resto.flatMap((i) => (i.lancs || []).map((l) => ({ ...l, c: i.nome }))).sort((a, b) => (a.d < b.d ? -1 : a.d > b.d ? 1 : 0)),
+  }];
+}
+const verItens = (i) => `${esc(i.nome)}: ${brl(i.valor)}. Toque para ver os itens`;
 
 // ---------- Gráfico por categoria (com escolha de tipo) ----------
 export function barrasCategoria(itens, { tipo = 'despesa', vazio = 'Nada registrado.' } = {}) {
@@ -39,6 +55,7 @@ export function barrasCategoria(itens, { tipo = 'despesa', vazio = 'Nada registr
   return `<div class="graf" data-graf="cat" data-serie="${serie}" data-dados="${esc(JSON.stringify(itens))}">
     ${seletor(TIPOS_CAT, atual)}
     <div class="graf-corpo">${desenharCat(atual, itens, serie)}</div>
+    <p class="graf-dica small">Toque numa categoria para ver os itens.</p>
   </div>`;
 }
 
@@ -46,25 +63,20 @@ function desenharCat(tipo, itens, serie) {
   const total = itens.reduce((s, i) => s + i.valor, 0);
   const pct = (v) => (total > 0 ? Math.round((v / total) * 100) : 0);
   if (tipo === 'pizza' || tipo === 'empilhada') {
-    // até 8 cores; o resto vira "Outras"
-    let lista = itens;
-    if (itens.length > CORES.length) {
-      const resto = itens.slice(CORES.length - 1);
-      lista = [...itens.slice(0, CORES.length - 1), { nome: `Outras (${resto.length})`, valor: resto.reduce((s, i) => s + i.valor, 0), outras: true }];
-    }
+    const lista = agruparOutras(itens);
     const cor = (i, k) => (i.outras ? COR_OUTRAS : CORES[k]);
-    const legenda = `<div class="graf-legenda" role="list">${lista.map((i, k) => `<div class="graf-leg" role="listitem">
+    const legenda = `<div class="graf-legenda">${lista.map((i, k) => `<button type="button" class="graf-leg graf-clic" data-cat-i="${k}" aria-label="${verItens(i)}">
       <i class="sw" style="background:${cor(i, k)}"></i><span class="graf-leg-nome">${esc(i.nome)}</span>
-      <span class="graf-leg-val">${brl(i.valor)} <span class="hbar-pct">${pct(i.valor)}%</span></span></div>`).join('')}</div>`;
+      <span class="graf-leg-val">${brl(i.valor)} <span class="hbar-pct">${pct(i.valor)}%</span></span></button>`).join('')}</div>`;
     if (tipo === 'empilhada') {
-      return `<div class="stack" role="img" aria-label="Divisão por categoria">${lista.map((i, k) => `<span style="flex:${Math.max(i.valor, total * 0.004)};background:${cor(i, k)}" title="${esc(i.nome)}: ${brl(i.valor)} (${pct(i.valor)}%)"></span>`).join('')}</div>${legenda}`;
+      return `<div class="stack" role="img" aria-label="Divisão por categoria">${lista.map((i, k) => `<span data-cat-i="${k}" style="flex:${Math.max(i.valor, total * 0.004)};background:${cor(i, k)}" title="${esc(i.nome)}: ${brl(i.valor)} (${pct(i.valor)}%)"></span>`).join('')}</div>${legenda}`;
     }
     // rosca em SVG
     const r = 46; const circ = 2 * Math.PI * r; const gap = lista.length > 1 ? 1.6 : 0;
     let acum = 0;
     const fatias = lista.map((i, k) => {
       const len = total > 0 ? (i.valor / total) * circ : 0;
-      const s = `<circle r="${r}" cx="60" cy="60" fill="none" stroke="${cor(i, k)}" stroke-width="18"
+      const s = `<circle data-cat-i="${k}" r="${r}" cx="60" cy="60" fill="none" stroke="${cor(i, k)}" stroke-width="18"
         stroke-dasharray="${Math.max(0, len - gap).toFixed(2)} ${circ.toFixed(2)}" stroke-dashoffset="${(-acum).toFixed(2)}"><title>${esc(i.nome)}: ${brl(i.valor)} (${pct(i.valor)}%)</title></circle>`;
       acum += len; return s;
     }).join('');
@@ -75,17 +87,17 @@ function desenharCat(tipo, itens, serie) {
   }
   const maior = Math.max(...itens.map((i) => i.valor));
   if (tipo === 'colunas') {
-    return `<div class="vcols ${serie}" role="list">${itens.map((i) => `<div class="vcol" role="listitem" aria-label="${esc(i.nome)}: ${brl(i.valor)}, ${pct(i.valor)}%" title="${esc(i.nome)}: ${brl(i.valor)}">
+    return `<div class="vcols ${serie}">${itens.map((i, k) => `<button type="button" class="vcol graf-clic" data-cat-i="${k}" aria-label="${verItens(i)}" title="${esc(i.nome)}: ${brl(i.valor)}">
       <span class="vcol-val">${esc(rotuloCurto(i.valor))}</span>
       <span class="vcol-area"><span class="vcol-bar" style="height:${maior > 0 ? Math.max(2, (i.valor / maior) * 100).toFixed(1) : 0}%"></span></span>
-      <span class="vcol-nome">${esc(i.nome)}</span><span class="vcol-pct">${pct(i.valor)}%</span></div>`).join('')}</div>`;
+      <span class="vcol-nome">${esc(i.nome)}</span><span class="vcol-pct">${pct(i.valor)}%</span></button>`).join('')}</div>`;
   }
-  return `<div class="hbars ${serie}" role="list">${itens.map((i) => {
+  return `<div class="hbars ${serie}">${itens.map((i, k) => {
     const w = maior > 0 ? Math.max(1.5, (i.valor / maior) * 100) : 0;
-    return `<div class="hbar" role="listitem" aria-label="${esc(i.nome)}: ${brl(i.valor)}, ${pct(i.valor)}%">
-      <div class="hbar-top"><span class="hbar-nome">${esc(i.nome)}</span><span class="hbar-val">${brl(i.valor)} <span class="hbar-pct">${pct(i.valor)}%</span></span></div>
-      <div class="hbar-track"><span style="width:${w.toFixed(1)}%"></span></div>
-    </div>`;
+    return `<button type="button" class="hbar graf-clic" data-cat-i="${k}" aria-label="${verItens(i)}">
+      <span class="hbar-top"><span class="hbar-nome">${esc(i.nome)}</span><span class="hbar-val">${brl(i.valor)} <span class="hbar-pct">${pct(i.valor)}%</span></span></span>
+      <span class="hbar-track"><span style="width:${w.toFixed(1)}%"></span></span>
+    </button>`;
   }).join('')}</div>`;
 }
 
@@ -143,6 +155,18 @@ if (typeof document !== 'undefined') {
       corpo.innerHTML = qual === 'cat' ? desenharCat(tipo, lerDados(x), x.dataset.serie) : desenharMeses(tipo, lerDados(x));
     });
   });
+  // Toque numa categoria: abre a lista de itens dela
+  document.addEventListener('click', (e) => {
+    const b = e.target.closest?.('[data-cat-i]');
+    if (!b) return;
+    const g = b.closest('.graf[data-graf="cat"]');
+    if (!g) return;
+    const tipo = g.querySelector('[data-graf-tipo][aria-pressed="true"]')?.dataset.grafTipo || 'barras';
+    const itens = lerDados(g);
+    const lista = tipo === 'pizza' || tipo === 'empilhada' ? agruparOutras(itens) : itens;
+    const cat = lista[Number(b.dataset.catI)];
+    if (cat) abrirCategoria(cat, g.dataset.serie === 'rec');
+  });
   const mostrarMes = (e) => {
     const b = e.target.closest?.('[data-mes-i]');
     if (!b) return;
@@ -157,6 +181,17 @@ if (typeof document !== 'undefined') {
   document.addEventListener('click', mostrarMes);
   document.addEventListener('mouseover', mostrarMes);
   document.addEventListener('focusin', mostrarMes);
+}
+
+function abrirCategoria(cat, rec) {
+  const lancs = cat.lancs || [];
+  const nome = cat.outras ? 'Outras categorias' : cat.nome;
+  openSheet(nome, `
+    <p class="small" style="margin:0">${lancs.length} ${lancs.length === 1 ? 'item' : 'itens'} · Total <strong>${brl(cat.valor)}</strong></p>
+    <div class="list cat-itens">${lancs.length ? lancs.map((l) => `<div class="item">
+      <span class="item-body"><span class="item-title">${esc(l.t)}</span>
+      <span class="item-sub">${dataCurta(l.d)}${l.c ? ` · ${esc(l.c)}` : ''}</span></span>
+      <span class="item-value${rec ? ' pos' : ''}">${brl(l.v)}</span></div>`).join('') : '<div class="empty">Nenhum item.</div>'}</div>`);
 }
 
 function escalaBonita(v) {
