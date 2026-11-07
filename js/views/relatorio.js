@@ -1,6 +1,6 @@
 // Relatório: escolhe o ano → escolhe o mês (ou todos) → gráficos
 import * as data from '../data.js';
-import { esc, brl, tabbar, topbar } from '../ui.js';
+import { esc, brl, tabbar, topbar, secao } from '../ui.js';
 import { somaPorCategoria, barrasCategoria, colunasMeses, ligarColunas, MESES_NOMES } from '../graficos.js';
 
 function params() {
@@ -72,10 +72,8 @@ export async function renderRelatorio(root, ctx) {
       ${topbar(titulo, { back: link(ano) })}
       <section class="card" aria-label="Resumo de ${esc(titulo)}">${kpis(t)}
         <p class="small" style="margin:0">${lancs.length} ${lancs.length === 1 ? 'lançamento' : 'lançamentos'}</p></section>
-      <section class="section"><h2 class="h-section">Despesas por categoria</h2>
-        ${barrasCategoria(somaPorCategoria(lancs, 'despesa', cats), { tipo: 'despesa', vazio: 'Nenhuma despesa neste mês.' })}</section>
-      <section class="section"><h2 class="h-section">Receitas por categoria</h2>
-        ${barrasCategoria(somaPorCategoria(lancs, 'receita', cats), { tipo: 'receita', vazio: 'Nenhuma receita neste mês.' })}</section>
+      ${secao('rel-mes-desp', 'Despesas por categoria', barrasCategoria(somaPorCategoria(lancs, 'despesa', cats), { tipo: 'despesa', vazio: 'Nenhuma despesa neste mês.' }))}
+      ${secao('rel-mes-rec', 'Receitas por categoria', barrasCategoria(somaPorCategoria(lancs, 'receita', cats), { tipo: 'receita', vazio: 'Nenhuma receita neste mês.' }))}
       <div class="btn-row">
         ${mes > 0 ? `<a class="btn outline" href="${link(ano, mes - 1)}">‹ ${MESES_NOMES[mes - 1].slice(0, 3)}</a>` : ''}
         ${mes < 11 ? `<a class="btn outline" href="${link(ano, mes + 1)}">${MESES_NOMES[mes + 1].slice(0, 3)} ›</a>` : ''}
@@ -111,14 +109,10 @@ export async function renderRelatorio(root, ctx) {
       <span class="eyebrow">Ano todo · unificado</span>${kpis(t)}
       ${ateHoje.length ? colunasMeses(ateHoje) : ''}
     </section>
-    <section class="section"><h2 class="h-section">Despesas por categoria no ano</h2>
-      ${barrasCategoria(somaPorCategoria(doAno, 'despesa', cats), { tipo: 'despesa', vazio: 'Nenhuma despesa neste ano.' })}</section>
-    <section class="section"><h2 class="h-section">Receitas por categoria no ano</h2>
-      ${barrasCategoria(somaPorCategoria(doAno, 'receita', cats), { tipo: 'receita', vazio: 'Nenhuma receita neste ano.' })}</section>
-    <section class="section"><h2 class="h-section">Mês a mês</h2>
-      ${comDados.length ? comDados.map(cartaoMes).join('') : '<div class="empty">Nenhum lançamento neste ano.</div>'}
-      ${semDados.length && comDados.length ? `<p class="small" style="margin:0">Sem lançamentos: ${semDados.join(', ')}.</p>` : ''}
-    </section>
+    ${secao('rel-ano-desp', 'Despesas por categoria no ano', barrasCategoria(somaPorCategoria(doAno, 'despesa', cats), { tipo: 'despesa', vazio: 'Nenhuma despesa neste ano.' }))}
+    ${secao('rel-ano-rec', 'Receitas por categoria no ano', barrasCategoria(somaPorCategoria(doAno, 'receita', cats), { tipo: 'receita', vazio: 'Nenhuma receita neste ano.' }))}
+    ${secao('rel-ano-meses', 'Mês a mês', `${comDados.length ? comDados.map(cartaoMes).join('') : '<div class="empty">Nenhum lançamento neste ano.</div>'}
+      ${semDados.length && comDados.length ? `<p class="small" style="margin:0">Sem lançamentos: ${semDados.join(', ')}.</p>` : ''}`)}
   </main>${tabbar('gastos')}`;
   if (ateHoje.length) ligarColunas(root, ateHoje);
 }

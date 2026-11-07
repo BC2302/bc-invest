@@ -153,3 +153,45 @@ export async function busy(btn, fn) {
   btn.textContent = 'Aguarde…';
   try { return await fn(); } finally { btn.disabled = false; btn.innerHTML = label; }
 }
+
+// ---------- Seções que dá para ocultar e mostrar (a escolha fica salva neste aparelho) ----------
+const CHAVE_OCULTOS = 'bcinvest.ocultos';
+function lerOcultos() {
+  try { return new Set(JSON.parse(localStorage.getItem(CHAVE_OCULTOS) || '[]')); } catch { return new Set(); }
+}
+export const estaOculto = (id) => lerOcultos().has(id);
+
+export function botaoOcultar(id, nome = '') {
+  const f = estaOculto(id);
+  return `<button class="rec-btn" type="button" data-rec-btn="${esc(id)}" aria-expanded="${!f}"${nome ? ` aria-label="${f ? 'Mostrar' : 'Ocultar'} ${esc(nome)}"` : ''}>${f ? 'Mostrar' : 'Ocultar'}</button>`;
+}
+
+// Seção com título, informação à direita e botão Ocultar/Mostrar
+export function secao(id, titulo, corpo, { info = '', sub = false, attrs = '' } = {}) {
+  const f = estaOculto(id);
+  const cab = sub ? `<h3 class="h-sub">${titulo}</h3>` : `<h2 class="h-section">${titulo}</h2>`;
+  return `<section class="${sub ? 'lanc-grupo' : 'section'} rec${f ? ' fechado' : ''}" data-rec="${esc(id)}" ${attrs}>
+    <div class="section-head${sub ? ' sub' : ''}">${cab}<span class="rec-dir">${info}${botaoOcultar(id, titulo.replace(/<[^>]+>/g, ''))}</span></div>
+    <div class="rec-corpo"${f ? ' hidden' : ''}>${corpo}</div>
+  </section>`;
+}
+
+if (typeof document !== 'undefined') {
+  document.addEventListener('click', (e) => {
+    const b = e.target.closest?.('[data-rec-btn]');
+    if (!b) return;
+    const caixa = b.closest('[data-rec]');
+    if (!caixa) return;
+    const fechar = !caixa.classList.contains('fechado');
+    caixa.classList.toggle('fechado', fechar);
+    const corpo = caixa.querySelector(':scope > .rec-corpo');
+    if (corpo) corpo.hidden = fechar;
+    b.textContent = fechar ? 'Mostrar' : 'Ocultar';
+    b.setAttribute('aria-expanded', String(!fechar));
+    const rot = b.getAttribute('aria-label');
+    if (rot) b.setAttribute('aria-label', rot.replace(/^(Mostrar|Ocultar)/, fechar ? 'Mostrar' : 'Ocultar'));
+    const s = lerOcultos();
+    if (fechar) s.add(caixa.dataset.rec); else s.delete(caixa.dataset.rec);
+    try { localStorage.setItem(CHAVE_OCULTOS, JSON.stringify([...s])); } catch { /* ok */ }
+  });
+}

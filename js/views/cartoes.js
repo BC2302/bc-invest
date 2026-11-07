@@ -3,7 +3,7 @@ import * as data from '../data.js';
 import { db, mensagemErro } from '../supa.js';
 import { calcularUso, vencimentoDaFatura } from '../cartao.js';
 import {
-  esc, brl, icon, tabbar, topbar, dataLonga, hojeISO, parseValor, valorInput, openSheet, closeSheet, toast, busy,
+  esc, brl, icon, tabbar, topbar, dataLonga, hojeISO, parseValor, valorInput, openSheet, closeSheet, toast, busy, secao,
 } from '../ui.js';
 
 export async function renderCartoes(root, ctx) {
@@ -47,10 +47,8 @@ export async function renderCartoes(root, ctx) {
         <div class="stat boxed"><span class="stat-label">Disponível</span><span class="stat-value ${uso.disponivel < 0 ? 'neg' : 'pos'}">${brl(uso.disponivel)}</span></div>
       </div>
     </section>
-    <section class="section"><h2 class="h-section">Seus cartões</h2>
-      <div class="lista-cartoes">${uso.lista.map(cartaoHTML).join('')}</div>
-      <p class="fine">Ao lançar uma despesa em Gastos, escolha o cartão. Compras ocupam o limite até o vencimento da fatura; contas parceladas, até cada parcela ser marcada como paga.</p>
-    </section>` : `<section class="card center">
+    ${secao('cartoes-lista', 'Seus cartões', `<div class="lista-cartoes">${uso.lista.map(cartaoHTML).join('')}</div>
+      <p class="fine">Ao lançar uma despesa em Gastos, escolha o cartão. Compras ocupam o limite até o vencimento da fatura; contas parceladas, até cada parcela ser marcada como paga.</p>`)}` : `<section class="card center">
       <span class="eyebrow">Nenhum cartão</span>
       <p class="small" style="margin:0">Cadastre seus cartões de crédito para acompanhar quanto do limite já foi usado e quanto ainda sobra.</p>
     </section>`}

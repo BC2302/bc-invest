@@ -1,6 +1,6 @@
 // Tela inicial
 import * as data from '../data.js';
-import { esc, brl, brlParts, icon, tabbar, nomeMes, dataLonga, limitesMes } from '../ui.js';
+import { esc, brl, brlParts, icon, tabbar, nomeMes, dataLonga, limitesMes, secao, estaOculto, botaoOcultar } from '../ui.js';
 import { situacao, nomeVencimento, previaHTML } from './contas.js';
 import { calcularUso } from '../cartao.js';
 
@@ -79,39 +79,36 @@ export async function renderInicio(root, ctx) {
         <span class="stat-label">Saldo do mês · ${mesAtual}</span>
         <span class="month-value${r.saldo < 0 ? ' neg' : ''}">${mask(brl(r.saldo))}</span>
       </div>
-      <div class="grid-2">
+      <div class="rec${estaOculto('inicio-detalhes') ? ' fechado' : ''}" data-rec="inicio-detalhes">
+      <div class="detalhes-head"><span class="stat-label">Detalhes do mês</span>${botaoOcultar('inicio-detalhes', 'detalhes do mês')}</div>
+      <div class="rec-corpo grid-2"${estaOculto('inicio-detalhes') ? ' hidden' : ''}>
         <div class="stat"><span class="stat-label">Receitas do mês</span><span class="stat-value pos">${mask(brl(r.receitas))}</span></div>
         <div class="stat"><span class="stat-label">Despesas do mês</span><span class="stat-value neg">${mask(brl(r.despesas))}</span></div>
         <div class="stat"><span class="stat-label">Guardado em metas</span><span class="stat-value">${mask(brl(guardadoMetas))}</span></div>
         <div class="stat"><span class="stat-label">Lançamentos no mês</span><span class="stat-value">${lancs.length}</span></div>
       </div>
-      ${aberto ? previaHTML(geral.saldo, aberto, `até o fim de ${mesAtual.toLowerCase()}`, mask) : ''}
+      </div>
+      ${aberto ? previaHTML(geral.saldo, aberto, `até o fim de ${mesAtual.toLowerCase()}`, mask, 'previa-inicio') : ''}
       ${usoCartoes ? `<a class="cartoes-resumo" href="#/cartoes">
         <span>${icon('card', 18)} Limite disponível nos cartões</span>
         <span class="${usoCartoes.disponivel < 0 ? 'neg' : ''}"><b>${mask(brl(usoCartoes.disponivel))}</b> <span class="small">de ${mask(brl(usoCartoes.limite))}</span></span>
       </a>` : ''}
     </section>
 
-    ${proximos.length ? `<section class="section">
-      <div class="section-head"><h2 class="h-section">Contas a vencer</h2><a class="link-btn" href="#/gastos">Ver todas</a></div>
-      <div class="list">${proximos.map((v) => {
+    ${proximos.length ? secao('inicio-vencer', 'Contas a vencer', `<div class="list">${proximos.map((v) => {
         const st = situacao(v);
         return `<a class="item" href="#/gastos" style="text-decoration:none">
           <span class="item-icon ${st.cls}">${icon('calendar', 18, 'currentColor', 1.6)}</span>
           <span class="item-body"><span class="item-title">${esc(nomeVencimento(v))}</span><span class="item-sub">${dataLonga(v.vencimento)}</span></span>
           <span class="item-right"><span class="item-value">${mask(brl(v.valor))}</span><span class="chip ${st.cls}">${st.txt}</span></span>
         </a>`;
-      }).join('')}</div>
-    </section>` : ''}
+      }).join('')}</div>`, { info: '<a class="link-btn" href="#/gastos">Ver todas</a>' }) : ''}
 
-    <section class="section">
-      <h2 class="h-section">Seus sistemas</h2>
-      <div class="systems">
+    ${secao('inicio-sistemas', 'Seus sistemas', `<div class="systems">
         ${SISTEMAS.map((s) => (s.id
           ? `<a class="system" href="#/${s.id}">${icon(s.ic, 26, '#C9CCD1', 1.4)}${s.nome}</a>`
           : `<div class="system soon" aria-label="${s.nome}, em breve"><span class="badge">Em breve</span>${icon(s.ic, 26, '#C9CCD1', 1.4)}${s.nome}</div>`)).join('')}
-      </div>
-    </section>
+      </div>`)}
 
     ${reserva ? (() => {
       const pct = Math.min(100, Math.round((Number(reserva.valor_atual) / Number(reserva.valor_alvo)) * 100));

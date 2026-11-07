@@ -9,7 +9,7 @@ import { opcoesCategoria, campoNovaCategoria, ligarNovaCategoria, resolverCatego
 import { situacao, nomeVencimento, painelVencimento, previaHTML, formReceber, ehReceita, REPETICAO } from './contas.js';
 import {
   esc, brl, brlParts, icon, tabbar, topbar, nomeMes, dataCurta, dataLonga, hojeISO, isoDate, limitesMes,
-  parseValor, valorInput, openSheet, closeSheet, toast, busy,
+  parseValor, valorInput, openSheet, closeSheet, toast, busy, secao,
 } from '../ui.js';
 
 const hoje = new Date();
@@ -122,10 +122,10 @@ export async function renderGastos(root, ctx) {
     const ls = emOrdem.filter((l) => l.tipo === tipo);
     if (!ls.length) return '';
     const total = ls.reduce((t, l) => t + Number(l.valor), 0);
-    return `<div class="lanc-grupo" data-grupo="${tipo}">
-      <div class="section-head sub"><h3 class="h-sub">${titulo}</h3><span class="small ${tipo === 'receita' ? 'pos' : 'neg'}">${ls.length} · ${brl(total)}</span></div>
-      <div class="list">${ls.map(itemLanc).join('')}</div>
-    </div>`;
+    return secao(`gastos-${tipo}s`, titulo, `<div class="list">${ls.map(itemLanc).join('')}</div>`, {
+      sub: true, attrs: `data-grupo="${tipo}"`,
+      info: `<span class="small ${tipo === 'receita' ? 'pos' : 'neg'}">${ls.length} · ${brl(total)}</span>`,
+    });
   };
   const lancHTML = lancs.length
     ? grupo('receita', 'Receitas') + grupo('despesa', 'Despesas')
@@ -147,7 +147,7 @@ export async function renderGastos(root, ctx) {
         <div class="stat boxed"><span class="stat-label">Pagas</span><span class="stat-value neg">${brl(r.despesas)}</span></div>
         <div class="stat boxed"><span class="stat-label">A pagar</span><span class="stat-value warn">${brl(totalAPagar)}</span></div>
       </div>
-      ${geral && aberto ? previaHTML(geral.saldo, aberto, mesAtual ? 'até o fim do mês' : `até ${dataCurta(fimMes)}`) : ''}
+      ${geral && aberto ? previaHTML(geral.saldo, aberto, mesAtual ? 'até o fim do mês' : `até ${dataCurta(fimMes)}`, undefined, 'previa-gastos') : ''}
     </section>
 
     <div class="btn-row">
@@ -155,31 +155,20 @@ export async function renderGastos(root, ctx) {
       <a class="btn outline" href="#/relatorio">${icon('chart', 18)} Relatório</a>
     </div>
 
-    ${aReceber.length ? `<section class="section">
-      <div class="section-head"><h2 class="h-section">A receber</h2><span class="small pos">${aReceber.length} · ${brl(totalAReceber)}</span></div>
-      <div class="list">${aReceberHTML}</div>
-    </section>` : ''}
+    ${aReceber.length ? secao('gastos-areceber', 'A receber', `<div class="list">${aReceberHTML}</div>`,
+      { info: `<span class="small pos">${aReceber.length} · ${brl(totalAReceber)}</span>` }) : ''}
 
-    <section class="section">
-      <div class="section-head"><h2 class="h-section">A pagar</h2><span class="small">${aPagar.length ? `${aPagar.length} · ${brl(totalAPagar)}` : ''}</span></div>
-      ${aPagarHTML}
-    </section>
+    ${secao('gastos-apagar', 'A pagar', aPagarHTML,
+      { info: `<span class="small">${aPagar.length ? `${aPagar.length} · ${brl(totalAPagar)}` : ''}</span>` })}
 
-    <section class="section" aria-label="Gráfico de gastos do mês">
-      <div class="section-head"><h2 class="h-section">Gastos do mês</h2><span class="small">${r.despesas ? brl(r.despesas) : ''}</span></div>
-      ${barrasCategoria(somaPorCategoria(lancs, 'despesa', cats), { tipo: 'despesa', vazio: 'Nenhuma despesa paga neste mês ainda.' })}
-    </section>
+    ${secao('gastos-grafico', 'Gastos do mês',
+      barrasCategoria(somaPorCategoria(lancs, 'despesa', cats), { tipo: 'despesa', vazio: 'Nenhuma despesa paga neste mês ainda.' }),
+      { info: `<span class="small">${r.despesas ? brl(r.despesas) : ''}</span>`, attrs: 'aria-label="Gráfico de gastos do mês"' })}
 
-    <section class="section">
-      <h2 class="h-section">Pagos e recebidos</h2>
-      ${lancHTML}
-    </section>
+    ${secao('gastos-pagos', 'Pagos e recebidos', lancHTML)}
 
-    <section class="section">
-      <div class="section-head"><h2 class="h-section">Orçamento por categoria</h2>
-      <a class="link-btn" href="#/categorias">Categorias e limites</a></div>
-      ${orcamentoHTML}
-    </section>
+    ${secao('gastos-orcamento', 'Orçamento por categoria', orcamentoHTML,
+      { info: '<a class="link-btn" href="#/categorias">Categorias e limites</a>' })}
 
     <div id="avisos"></div>
   </main>${tabbar('gastos')}`;

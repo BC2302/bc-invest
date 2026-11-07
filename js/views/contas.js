@@ -5,7 +5,7 @@ import { opcoesCategoria, campoNovaCategoria, ligarNovaCategoria, resolverCatego
 import { opcoesCartao } from '../cartao.js';
 import { formParcelas } from '../parcelas.js';
 import {
-  esc, brl, icon, dataLonga, hojeISO, diasEntre, parseValor, valorInput, openSheet, closeSheet, toast, busy,
+  esc, brl, icon, dataLonga, hojeISO, diasEntre, parseValor, valorInput, openSheet, closeSheet, toast, busy, estaOculto, botaoOcultar,
 } from '../ui.js';
 
 export const REPETICAO = { unica: 'Única', mensal: 'Mensal', parcelada: 'Parcelada' };
@@ -29,18 +29,21 @@ export function situacao(v, hojeStr = hojeISO()) {
 }
 
 // Prévia: o saldo disponível dá para pagar as contas em aberto?
-export function previaHTML(saldo, aberto, rotulo, mask = (t) => t) {
+export function previaHTML(saldo, aberto, rotulo, mask = (t) => t, id = 'previa') {
+  const f = estaOculto(id);
   const total = aberto.total;
   const receber = aberto.receber || 0;
   const sobra = saldo + receber - total;
   const falta = sobra < 0;
   const titulo = total === 0 ? (falta ? 'Saldo negativo' : 'Saldo livre') : falta ? 'Vai faltar' : 'Vai sobrar';
   const cobre = total > 0 && falta ? Math.max(0, Math.floor((Math.max(saldo + receber, 0) / total) * 100)) : null;
-  return `<div class="previa${falta ? ' falta' : ''}" role="status" aria-label="Prévia das contas">
-    <span class="eyebrow">Prévia ${esc(rotulo)}</span>
+  return `<div class="previa rec${falta ? ' falta' : ''}${f ? ' fechado' : ''}" data-rec="${id}" role="status" aria-label="Prévia das contas">
+    <div class="previa-head"><span class="eyebrow">Prévia ${esc(rotulo)}</span>${botaoOcultar(id, 'detalhes da prévia')}</div>
+    <div class="rec-corpo"${f ? ' hidden' : ''}>
     <div class="previa-linha"><span>Saldo disponível hoje</span><span>${mask(brl(saldo))}</span></div>
     ${receber ? `<div class="previa-linha"><span>A receber (${aberto.qtdReceber})</span><span class="pos">+ ${mask(brl(receber))}</span></div>` : ''}
     <div class="previa-linha"><span>Contas a pagar${total ? ` (${aberto.qtd})` : ''}</span><span>${total ? `− ${mask(brl(total))}` : mask(brl(0))}</span></div>
+    </div>
     <div class="previa-total"><span>${titulo}</span><strong class="${falta ? 'neg' : 'pos'}">${mask(brl(Math.abs(sobra)))}</strong></div>
     ${cobre != null ? `<p class="fine">Seu saldo${receber ? ' com o que vai receber' : ''} cobre ${cobre}% dessas contas.${receber ? '' : ' Cadastre seu salário em "+ Novo → Receita → Vou receber" para a prévia contar com ele.'}</p>` : ''}
   </div>`;

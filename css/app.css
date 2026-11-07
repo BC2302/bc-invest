@@ -386,3 +386,15 @@ a:hover { color: var(--silver-hi); }
 .cartoes-resumo > span:first-child { display: inline-flex; align-items: center; gap: 8px; color: var(--muted); }
 .cartoes-resumo b { font-size: 15px; }
 .cartoes-resumo:hover { border-color: var(--silver); }
+
+/* ---------- Ocultar / mostrar seções ---------- */
+.rec-dir { display: inline-flex; align-items: center; gap: 10px; flex-shrink: 0; }
+.rec-btn { min-height: 32px; padding: 0 10px; border: 1px solid var(--line-2); background: transparent; color: var(--muted);
+  font-size: 11px; font-weight: 700; letter-spacing: .6px; cursor: pointer; }
+.rec-btn:hover { color: var(--silver-hi); border-color: var(--silver); }
+.rec.fechado > .section-head { opacity: .85; }
+.previa-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.previa .rec-corpo { display: grid; gap: 8px; }
+.detalhes-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.rec-corpo[hidden] { display: none !important; }
+.section > .rec-corpo { display: flex; flex-direction: column; gap: 12px; }
