@@ -17,6 +17,11 @@ export function renderConta(root, ctx) {
 
     <section class="section"><h2 class="h-section">Avisos</h2><div id="avisos"></div></section>
 
+    <section class="section"><h2 class="h-section">Categorias</h2>
+      <p class="fine">Crie, renomeie ou exclua categorias de despesas e receitas e defina limites de gasto por mês.</p>
+      <a class="btn outline" href="#/categorias?de=conta">${icon('edit', 18)} Editar categorias</a>
+    </section>
+
     <form class="form" id="f-nome" novalidate>
       <h2 class="h-section">Seu nome</h2>
       <label class="field">Como quer ser chamado

@@ -4,6 +4,7 @@ import { db, mensagemErro } from '../supa.js';
 import { cartaoAvisos } from '../push.js';
 import { somaPorCategoria, barrasCategoria } from '../graficos.js';
 import { opcoesCartao, vencimentoDaFatura } from '../cartao.js';
+import { formParcelarLancamento } from '../parcelas.js';
 import { opcoesCategoria, campoNovaCategoria, ligarNovaCategoria, resolverCategoria } from '../categoria.js';
 import { situacao, nomeVencimento, painelVencimento, previaHTML, formReceber, ehReceita, REPETICAO } from './contas.js';
 import {
@@ -176,7 +177,7 @@ export async function renderGastos(root, ctx) {
 
     <section class="section">
       <div class="section-head"><h2 class="h-section">Orçamento por categoria</h2>
-      <button class="link-btn" type="button" id="editar-cats">Editar</button></div>
+      <a class="link-btn" href="#/categorias">Categorias e limites</a></div>
       ${orcamentoHTML}
     </section>
 
@@ -189,7 +190,6 @@ export async function renderGastos(root, ctx) {
   root.querySelector('#mes-prox').addEventListener('click', () => { if (++mes > 11) { mes = 0; ano++; } recarregar(); });
   root.querySelector('#novo').addEventListener('click', () => formLancamento(null, cats, recarregar, cartoes));
   root.querySelector('#novo-top').addEventListener('click', () => formLancamento(null, cats, recarregar, cartoes));
-  root.querySelector('#editar-cats').addEventListener('click', () => formCategorias(cats, recarregar));
 
   const todasVencs = [...aPagar, ...aReceber, ...pagas];
   root.querySelectorAll('[data-venc]').forEach((b) => b.addEventListener('click', () => {
@@ -265,6 +265,7 @@ function formLancamento(lanc, cats, recarregar, cartoes = []) {
       <p class="fine" id="cartao-ajuda" hidden></p>
       <p class="form-error" role="alert" hidden></p>
       <button class="btn" type="submit" id="salvar">${lanc ? 'Salvar alterações' : 'Adicionar'}</button>
+      ${lanc?.tipo === 'despesa' ? `<button class="btn outline" type="button" id="parcelar">${icon('calendar', 18)} Parcelar esta compra</button>` : ''}
       ${lanc ? '<button class="btn danger" type="button" id="excluir">Excluir lançamento</button>' : ''}
     </form>`);
 
@@ -372,6 +373,7 @@ function formLancamento(lanc, cats, recarregar, cartoes = []) {
     } catch (ex) { falha(ex.message?.startsWith('Informe') ? ex.message : mensagemErro(ex)); }
   });
 
+  sheet.querySelector('#parcelar')?.addEventListener('click', () => formParcelarLancamento(lanc, recarregar, cartoes));
   const del = sheet.querySelector('#excluir');
   if (del) {
     let armado = false;
@@ -383,91 +385,4 @@ function formLancamento(lanc, cats, recarregar, cartoes = []) {
       } catch (ex) { falha(mensagemErro(ex)); }
     });
   }
-}
-
-function formCategorias(cats, recarregar) {
-  const despesas = cats.filter((c) => c.tipo === 'despesa');
-  const receitas = cats.filter((c) => c.tipo === 'receita');
-  const sheet = openSheet('Categorias e limites', `
-    <p class="fine">Defina quanto você quer gastar, no máximo, por mês em cada categoria. Deixe em branco para não ter limite.</p>
-    <form class="form" id="f-limites" novalidate>
-      ${despesas.map((c) => `<div style="display:flex;gap:10px;align-items:flex-end">
-        <label class="field" style="flex:1">${esc(c.nome)}
-          <input data-cat="${esc(c.id)}" inputmode="decimal" placeholder="Sem limite" value="${esc(valorInput(c.orcamento))}"></label>
-        <button class="icon-btn ghost" type="button" data-del="${esc(c.id)}" aria-label="Remover categoria ${esc(c.nome)}">${icon('close', 18)}</button>
-      </div>`).join('')}
-      <p class="form-error" role="alert" hidden></p>
-      <button class="btn" type="submit">Salvar limites</button>
-    </form>
-    <div class="divider"></div>
-    <div class="section">
-      <h3 class="h-section">Categorias de receita</h3>
-      <div class="list">${receitas.map((c) => `<div class="item" style="cursor:default">
-        <span class="item-body"><span class="item-title">${esc(c.nome)}</span></span>
-        <button class="icon-btn ghost" type="button" data-del="${esc(c.id)}" aria-label="Remover categoria ${esc(c.nome)}">${icon('close', 18)}</button></div>`).join('')
-        || '<p class="fine">Nenhuma.</p>'}</div>
-    </div>
-    <div class="divider"></div>
-    <form class="form" id="f-nova" novalidate>
-      <h3 class="h-section">Nova categoria</h3>
-      <div class="grid-2">
-        <label class="field">Nome<input name="nome" maxlength="40" autocomplete="off"></label>
-        <label class="field">Tipo<select name="tipo"><option value="despesa">Despesa</option><option value="receita">Receita</option></select></label>
-      </div>
-      <p class="form-error" role="alert" hidden></p>
-      <button class="btn outline" type="submit">Adicionar categoria</button>
-    </form>`);
-
-  const fl = sheet.querySelector('#f-limites');
-  const errL = fl.querySelector('.form-error');
-  fl.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const updates = [];
-    for (const inp of fl.querySelectorAll('input[data-cat]')) {
-      const c = despesas.find((x) => x.id === inp.dataset.cat);
-      const txt = inp.value.trim();
-      const novo = txt === '' ? null : parseValor(txt);
-      if (txt !== '' && !(novo >= 0)) { errL.textContent = `Valor inválido em ${c.nome}.`; errL.hidden = false; inp.focus(); return; }
-      const atual = c.orcamento == null ? null : Number(c.orcamento);
-      if (novo !== atual) updates.push(db.update('categorias', c.id, { orcamento: novo }));
-    }
-    try {
-      await busy(fl.querySelector('button[type=submit]'), () => Promise.all(updates));
-      closeSheet(); toast('Limites salvos.'); recarregar();
-    } catch (ex) { errL.textContent = mensagemErro(ex); errL.hidden = false; }
-  });
-
-  sheet.querySelectorAll('[data-del]').forEach((b) => {
-    let armado = false;
-    b.addEventListener('click', async () => {
-      if (!armado) { armado = true; b.style.color = 'var(--neg)'; b.setAttribute('aria-label', 'Toque de novo para remover'); toast('Toque de novo no X para remover. Os lançamentos ficam sem categoria.'); return; }
-      try {
-        await db.remove('categorias', b.dataset.del);
-        recarregar();
-        const idx = cats.findIndex((c) => c.id === b.dataset.del);
-        if (idx >= 0) cats.splice(idx, 1);
-        formCategorias(cats, recarregar);
-        toast('Categoria removida.');
-      } catch (ex) { toast(mensagemErro(ex)); }
-    });
-  });
-
-  const fn = sheet.querySelector('#f-nova');
-  const errN = fn.querySelector('.form-error');
-  fn.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const nome = fn.nome.value.trim();
-    if (!nome) { errN.textContent = 'Informe o nome da categoria.'; errN.hidden = false; return; }
-    if (cats.some((c) => c.tipo === fn.tipo.value && c.nome.toLowerCase() === nome.toLowerCase())) {
-      errN.textContent = 'Já existe uma categoria com esse nome.'; errN.hidden = false; return;
-    }
-    try {
-      const nova = await busy(fn.querySelector('button'), () => db.insert('categorias', { nome, tipo: fn.tipo.value }));
-      cats.push(nova);
-      cats.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
-      recarregar();
-      formCategorias(cats, recarregar);
-      toast('Categoria adicionada.');
-    } catch (ex) { errN.textContent = mensagemErro(ex); errN.hidden = false; }
-  });
 }

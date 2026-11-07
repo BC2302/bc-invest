@@ -3,6 +3,7 @@
 import { db, mensagemErro } from '../supa.js';
 import { opcoesCategoria, campoNovaCategoria, ligarNovaCategoria, resolverCategoria } from '../categoria.js';
 import { opcoesCartao } from '../cartao.js';
+import { formParcelas } from '../parcelas.js';
 import {
   esc, brl, icon, dataLonga, hojeISO, diasEntre, parseValor, valorInput, openSheet, closeSheet, toast, busy,
 } from '../ui.js';
@@ -68,6 +69,10 @@ export function painelVencimento(v, conta, cats, recarregar, cartoes = []) {
       : (v.pago_em ? 'O pagamento entrou como despesa em Gastos. Ao desfazer, essa despesa é apagada.' : 'Ao marcar como paga, a conta entra automaticamente como despesa em Gastos, com a data de hoje.')}</p>
     <div class="btn-row">
       ${v.pago_em ? '' : `<button class="btn outline" type="button" id="editar">${icon('edit', 18)} Editar valor ou data</button>`}
+    </div>
+    ${!rec && (conta?.repeticao === 'parcelada' || (conta?.repeticao === 'unica' && !v.pago_em))
+      ? `<button class="btn outline" type="button" id="parcelas">${icon('calendar', 18)} ${conta.repeticao === 'parcelada' ? 'Mudar nº de parcelas' : 'Parcelar esta conta'}</button>` : ''}
+    <div class="btn-row">
       <button class="btn danger" type="button" id="excluir">${rec ? 'Excluir receita' : 'Excluir conta'}</button>
     </div>
     ${conta?.repeticao === 'mensal' && conta.ativa ? `<button class="link-btn" type="button" id="encerrar">${rec ? 'Parar de repetir esta receita' : 'Parar de repetir esta conta'}</button>` : ''}
@@ -82,6 +87,7 @@ export function painelVencimento(v, conta, cats, recarregar, cartoes = []) {
   acao(sheet.querySelector('#desfazer'), () => db.rpc('desfazer_pagamento', { p_id: v.id }), rec ? 'Recebimento desfeito.' : 'Pagamento desfeito.');
   sheet.querySelector('#receber')?.addEventListener('click', () => formReceber(v, recarregar));
   sheet.querySelector('#editar')?.addEventListener('click', () => formEditarConta(conta, v, cats, recarregar, cartoes));
+  sheet.querySelector('#parcelas')?.addEventListener('click', () => formParcelas(conta, v, recarregar));
 
   const enc = sheet.querySelector('#encerrar');
   if (enc) {

@@ -9,6 +9,7 @@ import { renderSimulador } from './views/simulador.js';
 import { renderConta } from './views/conta.js';
 import { renderRelatorio } from './views/relatorio.js';
 import { renderCartoes } from './views/cartoes.js';
+import { renderCategorias } from './views/categorias.js';
 
 const VIEWS = {
   inicio: renderInicio,
@@ -19,6 +20,7 @@ const VIEWS = {
   conta: renderConta,
   relatorio: renderRelatorio,
   cartoes: renderCartoes,
+  categorias: renderCategorias,
 };
 
 const root = document.getElementById('app');
