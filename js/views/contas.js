@@ -76,7 +76,7 @@ export function painelVencimento(v, conta, cats, recarregar, cartoes = []) {
     ${!rec && (conta?.repeticao === 'parcelada' || (conta?.repeticao === 'unica' && !v.pago_em))
       ? `<button class="btn outline" type="button" id="parcelas">${icon('calendar', 18)} ${conta.repeticao === 'parcelada' ? 'Mudar nº de parcelas' : 'Parcelar esta conta'}</button>` : ''}
     <div class="btn-row">
-      <button class="btn danger" type="button" id="excluir">${rec ? 'Excluir receita' : 'Excluir conta'}</button>
+      <button class="btn danger" type="button" id="excluir">${conta?.repeticao === 'parcelada' ? 'Excluir parcela…' : conta?.repeticao === 'mensal' ? 'Excluir…' : rec ? 'Excluir receita' : 'Excluir conta'}</button>
     </div>
     ${conta?.repeticao === 'mensal' && conta.ativa ? `<button class="link-btn" type="button" id="encerrar">${rec ? 'Parar de repetir esta receita' : 'Parar de repetir esta conta'}</button>` : ''}
     <p class="form-error" role="alert" hidden></p>`);
@@ -101,14 +101,46 @@ export function painelVencimento(v, conta, cats, recarregar, cartoes = []) {
     });
   }
   const del = sheet.querySelector('#excluir');
+  if (conta && conta.repeticao !== 'unica') {
+    del.addEventListener('click', () => formExcluir(v, conta, recarregar));
+    return;
+  }
   let armado = false;
   del.addEventListener('click', async () => {
-    if (!armado) {
-      armado = true;
-      del.textContent = conta?.repeticao === 'unica' ? 'Confirmar exclusão' : 'Excluir todos os meses/parcelas?';
-      return;
-    }
+    if (!armado) { armado = true; del.textContent = 'Confirmar exclusão'; return; }
     try { await busy(del, () => db.remove('contas', v.conta_id)); closeSheet(); toast('Conta excluída.'); recarregar(); } catch (ex) { falha(mensagemErro(ex)); }
+  });
+}
+
+// Excluir parcela/mês: só esta, desta em diante ou tudo
+function formExcluir(v, conta, recarregar) {
+  const parc = conta.repeticao === 'parcelada';
+  const rec = ehReceita(v);
+  const nome = nomeVencimento(v);
+  const sheet = openSheet(`Excluir: ${nome}`, `
+    <p class="fine">O que você quer excluir? O que já foi ${rec ? 'recebido' : 'pago'} continua em "Pagos e recebidos".</p>
+    ${v.pago_em
+      ? `<p class="small" style="margin:0">Esta ${parc ? 'parcela' : 'cobrança'} já foi ${rec ? 'recebida' : 'paga'}. Para excluir só ela, desfaça o ${rec ? 'recebimento' : 'pagamento'} antes.</p>`
+      : `<button class="btn outline" type="button" data-escopo="esta">${parc ? `Só esta parcela (${v.parcela}/${v.total_parcelas})` : 'Só este mês'}</button>`}
+    <button class="btn outline" type="button" data-escopo="seguintes">${parc ? 'Esta e as próximas parcelas' : 'Este mês e os próximos'}</button>
+    <p class="fine" style="margin-top:-4px">${parc ? 'Apaga as parcelas em aberto a partir desta. As que sobrarem são renumeradas.' : `A ${rec ? 'receita' : 'conta'} para de repetir a partir deste mês.`}</p>
+    <button class="btn danger" type="button" data-escopo="todas">${parc ? 'A compra inteira (todas as parcelas)' : `A ${rec ? 'receita' : 'conta'} inteira (todos os meses)`}</button>
+    <p class="form-error" role="alert" hidden></p>`);
+  const err = sheet.querySelector('.form-error');
+  const msgs = {
+    esta: parc ? 'Parcela excluída.' : 'Mês excluído.',
+    seguintes: parc ? 'Parcelas excluídas.' : 'Não vai mais repetir a partir deste mês.',
+    todas: parc ? 'Compra excluída.' : (rec ? 'Receita excluída.' : 'Conta excluída.'),
+  };
+  sheet.querySelectorAll('[data-escopo]').forEach((b) => {
+    let armado = false;
+    b.addEventListener('click', async () => {
+      if (!armado) { armado = true; b.textContent = `Confirmar: ${b.textContent}`; return; }
+      try {
+        await busy(b, () => db.rpc('excluir_vencimento', { p_id: v.id, p_escopo: b.dataset.escopo }));
+        closeSheet(); toast(msgs[b.dataset.escopo]); recarregar();
+      } catch (ex) { err.textContent = /já foi paga/.test(ex.message) ? ex.message : mensagemErro(ex); err.hidden = false; }
+    });
   });
 }
 

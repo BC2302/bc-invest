@@ -168,7 +168,7 @@ export async function renderGastos(root, ctx) {
     ${secao('gastos-pagos', 'Pagos e recebidos', lancHTML)}
 
     ${secao('gastos-orcamento', 'Orçamento por categoria', orcamentoHTML,
-      { info: '<a class="link-btn" href="#/categorias">Categorias e limites</a>' })}
+      { info: '<a class="link-btn" href="#/categorias">Categorias</a>' })}
 
     <div id="avisos"></div>
   </main>${tabbar('gastos')}`;
