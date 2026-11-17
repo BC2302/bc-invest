@@ -62,5 +62,21 @@ export function calcularUso({ cartoes, lancs, contas, vencs }, hoje = hojeISO())
   return { lista, limite, usado, disponivel: limite - usado };
 }
 
-export const opcoesCartao = (cartoes, sel) => `<option value="">Não usei cartão</option>${cartoes
-  .map((c) => `<option value="${c.id}"${c.id === sel ? ' selected' : ''}>${esc(c.nome)}</option>`).join('')}`;
+// Forma de pagamento: Pix, Dinheiro ou um dos cartões de crédito (no mesmo campo)
+export const FORMAS = { pix: 'Pix', dinheiro: 'Dinheiro' };
+export function opcoesCartao(cartoes, sel, forma) {
+  const op = (v, nome, marcado) => `<option value="${esc(v)}"${marcado ? ' selected' : ''}>${esc(nome)}</option>`;
+  return `${op('', 'Não informado', !sel && !forma)}${Object.entries(FORMAS).map(([k, n]) => op(k, n, !sel && forma === k)).join('')}${cartoes.length
+    ? `<optgroup label="Cartão de crédito">${cartoes.map((c) => op(c.id, c.nome, c.id === sel)).join('')}</optgroup>` : ''}`;
+}
+// Valor do campo → { cartao_id, forma_pagamento }
+export function lerPagamento(v) {
+  if (!v) return { cartao_id: null, forma_pagamento: null };
+  if (FORMAS[v]) return { cartao_id: null, forma_pagamento: v };
+  return { cartao_id: v, forma_pagamento: null };
+}
+// Texto curto para as listas: "Pix", "Dinheiro" ou o nome do cartão
+export function nomePagamento(item, nomeCartao) {
+  if (item?.cartao_id && nomeCartao?.has(item.cartao_id)) return nomeCartao.get(item.cartao_id);
+  return FORMAS[item?.forma_pagamento] || '';
+}

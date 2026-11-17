@@ -3,7 +3,7 @@ import * as data from '../data.js';
 import { db, mensagemErro } from '../supa.js';
 import { cartaoAvisos } from '../push.js';
 import { somaPorCategoria, barrasCategoria } from '../graficos.js';
-import { opcoesCartao, vencimentoDaFatura } from '../cartao.js';
+import { opcoesCartao, vencimentoDaFatura, lerPagamento, nomePagamento } from '../cartao.js';
 import { formParcelarLancamento } from '../parcelas.js';
 import { opcoesCategoria, campoNovaCategoria, ligarNovaCategoria, resolverCategoria } from '../categoria.js';
 import { situacao, nomeVencimento, painelVencimento, previaHTML, formReceber, ehReceita, REPETICAO } from './contas.js';
@@ -83,7 +83,7 @@ export async function renderGastos(root, ctx) {
       <button class="item-main" type="button" data-venc="${esc(v.id)}">
         <span class="item-icon ${st.cls}">${icon('calendar', 18, 'currentColor', 1.6)}</span>
         <span class="item-body"><span class="item-title">${esc(nomeVencimento(v))}</span>
-        <span class="item-sub"><span class="${st.cls}">${st.txt}</span> · ${REPETICAO[conta?.repeticao] || 'Conta'}${cat ? ` · ${esc(cat.nome)}` : ''}${conta?.cartao_id && nomeCartao.has(conta.cartao_id) ? ` · ${esc(nomeCartao.get(conta.cartao_id))}` : ''}</span></span>
+        <span class="item-sub"><span class="${st.cls}">${st.txt}</span> · ${REPETICAO[conta?.repeticao] || 'Conta'}${cat ? ` · ${esc(cat.nome)}` : ''}${nomePagamento(conta, nomeCartao) ? ` · ${esc(nomePagamento(conta, nomeCartao))}` : ''}</span></span>
         <span class="item-value">${brl(v.valor)}</span>
       </button>
       <button class="pay-btn" type="button" data-pagar="${esc(v.id)}" aria-label="Pagar ${esc(nomeVencimento(v))}">Pagar</button>
@@ -112,7 +112,7 @@ export async function renderGastos(root, ctx) {
     return `<button class="item" type="button" data-lanc="${esc(l.id)}">
       <span class="item-icon ${rec ? 'pos' : 'neg'}">${icon(rec ? 'up' : venc ? 'check' : 'down', 18, 'currentColor', 1.6)}</span>
       <span class="item-body"><span class="item-title">${esc(l.descricao)}</span>
-      <span class="item-sub">${dataCurta(l.data)} · ${esc(cat?.nome || (rec ? 'Receita' : 'Sem categoria'))}${l.cartao_id && nomeCartao.has(l.cartao_id) ? ` · ${esc(nomeCartao.get(l.cartao_id))}` : ''}${venc ? (rec ? ' · recebido' : ' · conta paga') : ''}</span></span>
+      <span class="item-sub">${dataCurta(l.data)} · ${esc(cat?.nome || (rec ? 'Receita' : 'Sem categoria'))}${nomePagamento(l, nomeCartao) ? ` · ${esc(nomePagamento(l, nomeCartao))}` : ''}${venc ? (rec ? ' · recebido' : ' · conta paga') : ''}</span></span>
       <span class="item-value${rec ? ' pos' : ''}">${rec ? '+' : '−'} ${brl(l.valor)}</span>
     </button>`;
   };
@@ -249,8 +249,8 @@ function formLancamento(lanc, cats, recarregar, cartoes = []) {
           <input name="data" type="date" value="${esc(lanc?.data || dataPadrao())}" required></label>
       </div>
       ${campoNovaCategoria()}
-      ${cartoes.length ? `<label class="field" id="campo-cartao">Cartão de crédito
-        <select name="cartao">${opcoesCartao(cartoes, lanc?.cartao_id)}</select></label>` : ''}
+      <label class="field" id="campo-cartao">Forma de pagamento
+        <select name="cartao">${opcoesCartao(cartoes, lanc?.cartao_id, lanc?.forma_pagamento)}</select></label>
       <p class="fine" id="cartao-ajuda" hidden></p>
       <p class="form-error" role="alert" hidden></p>
       <button class="btn" type="submit" id="salvar">${lanc ? 'Salvar alterações' : 'Adicionar'}</button>
@@ -337,7 +337,7 @@ function formLancamento(lanc, cats, recarregar, cartoes = []) {
     const dataISO = form.data.value;
     const apagar = !lanc && situ === 'apagar';
     const parcelas = apagar && rep === 'parcelada' ? Number(form.parcelas.value) : null;
-    const cartaoId = tipo === 'despesa' ? (form.cartao?.value || null) : null;
+    const pag = tipo === 'despesa' ? lerPagamento(form.cartao?.value) : lerPagamento('');
     if (!(valor > 0)) return falha('Informe um valor maior que zero.');
     if (valor > 999999999999) return falha('Valor muito alto.');
     if (!descricao) return falha('Informe uma descrição.');
@@ -350,10 +350,10 @@ function formLancamento(lanc, cats, recarregar, cartoes = []) {
           const id = await db.rpc('criar_conta', {
             p_descricao: descricao, p_valor: valor, p_categoria: categoria, p_repeticao: rep, p_inicio: dataISO, p_parcelas: parcelas, p_tipo: tipo,
           });
-          if (cartaoId && id) await db.update('contas', id, { cartao_id: cartaoId });
+          if ((pag.cartao_id || pag.forma_pagamento) && id) await db.update('contas', id, pag);
           return id;
         }
-        const row = { tipo, valor, descricao, data: dataISO, categoria_id: categoria, cartao_id: cartaoId };
+        const row = { tipo, valor, descricao, data: dataISO, categoria_id: categoria, ...pag };
         return lanc ? db.update('lancamentos', lanc.id, row) : db.insert('lancamentos', row);
       });
       closeSheet();

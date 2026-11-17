@@ -7,7 +7,7 @@ export const categorias = () => db.select('categorias', 'select=id,nome,tipo,orc
 export function lancamentosDoMes(ano, mes) {
   const { inicio, fim } = limitesMes(ano, mes);
   return db.select('lancamentos',
-    `select=id,tipo,descricao,valor,data,categoria_id,cartao_id&data=gte.${inicio}&data=lte.${fim}&order=data.desc,criado_em.desc`);
+    `select=id,tipo,descricao,valor,data,categoria_id,cartao_id,forma_pagamento&data=gte.${inicio}&data=lte.${fim}&order=data.desc,criado_em.desc`);
 }
 
 // Relatório: lançamentos de um ano inteiro e o primeiro ano com dados
@@ -40,7 +40,7 @@ export function resumo(lancs) {
 }
 
 // ---------- Contas a pagar ----------
-export const contas = () => db.select('contas', 'select=id,descricao,valor,categoria_id,repeticao,dia_vencimento,parcelas,ativa,cartao_id');
+export const contas = () => db.select('contas', 'select=id,descricao,valor,categoria_id,repeticao,dia_vencimento,parcelas,ativa,cartao_id,forma_pagamento');
 
 const CAMPOS_VENC = 'select=id,conta_id,descricao,valor,categoria_id,vencimento,parcela,total_parcelas,pago_em,lancamento_id,tipo';
 
